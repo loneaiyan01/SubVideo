@@ -12,7 +12,7 @@ async function loadFFmpeg(): Promise<FFmpeg> {
 
   ffmpeg = new FFmpeg();
 
-  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
 
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
@@ -74,8 +74,10 @@ export async function convertToMP4(
     console.warn("FFmpeg stream copy failed, falling back to re-encoding...");
     // Fall back to re-encoding
     try {
-      await ff.deleteFile("output.mp4").catch(() => {});
-    } catch { /* ignore */ }
+      await ff.deleteFile("output.mp4");
+    } catch { 
+      // ignore
+    }
 
     ret = await ff.exec([
       "-i", "input.webm",
