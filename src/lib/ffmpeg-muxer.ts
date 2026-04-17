@@ -62,21 +62,22 @@ export async function convertToMP4(
     }
   });
 
-  try {
-    // Try stream copy first (fastest)
-    await ff.exec([
-      "-i", "input.webm",
-      "-c", "copy",
-      "-movflags", "+faststart",
-      "output.mp4",
-    ]);
-  } catch {
+  // Try stream copy first (fastest)
+  let ret = await ff.exec([
+    "-i", "input.webm",
+    "-c", "copy",
+    "-movflags", "+faststart",
+    "output.mp4",
+  ]);
+
+  if (ret !== 0) {
+    console.warn("FFmpeg stream copy failed, falling back to re-encoding...");
     // Fall back to re-encoding
     try {
       await ff.deleteFile("output.mp4").catch(() => {});
     } catch { /* ignore */ }
 
-    await ff.exec([
+    ret = await ff.exec([
       "-i", "input.webm",
       "-c:v", "libx264",
       "-preset", "ultrafast",
@@ -86,6 +87,10 @@ export async function convertToMP4(
       "-movflags", "+faststart",
       "output.mp4",
     ]);
+
+    if (ret !== 0) {
+      throw new Error(`FFmpeg MP4 conversion failed with exit code ${ret}`);
+    }
   }
 
   onProgress(90);
