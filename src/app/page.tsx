@@ -1,14 +1,21 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { Header } from "@/components/header";
 import { UploadZone } from "@/components/upload-zone";
-import { VideoPreview } from "@/components/video-preview";
+import { VideoPreview, VideoPreviewHandle } from "@/components/video-preview";
 import { StyleControls } from "@/components/style-controls";
 import { ExportPanel } from "@/components/export-panel";
-import { SubtitleEditor } from "@/components/subtitle-editor";
+import { BatchPanel } from "@/components/batch-panel";
+import { TimelineEditor } from "@/components/timeline-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SubtitleCue, SubtitleStyle, DEFAULT_STYLE } from "@/types";
+import {
+  SubtitleCue,
+  SubtitleStyle,
+  ExportSettings,
+  DEFAULT_STYLE,
+  DEFAULT_EXPORT_SETTINGS,
+} from "@/types";
 import { parseSRT } from "@/lib/srt-parser";
 
 export default function Home() {
@@ -16,7 +23,13 @@ export default function Home() {
   const [srtFile, setSrtFile] = useState<File | null>(null);
   const [subtitles, setSubtitles] = useState<SubtitleCue[]>([]);
   const [style, setStyle] = useState<SubtitleStyle>(DEFAULT_STYLE);
+  const [exportSettings, setExportSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Video timeline sync state
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const videoRef = useRef<VideoPreviewHandle>(null);
 
   const handleVideoUpload = useCallback((file: File) => {
     setVideoFile(file);
@@ -31,11 +44,17 @@ export default function Home() {
 
   const handleVideoRemove = useCallback(() => {
     setVideoFile(null);
+    setCurrentTime(0);
+    setDuration(0);
   }, []);
 
   const handleSrtRemove = useCallback(() => {
     setSrtFile(null);
     setSubtitles([]);
+  }, []);
+
+  const handleSeek = useCallback((time: number) => {
+    videoRef.current?.seekTo(time);
   }, []);
 
   const hasFiles = videoFile !== null || srtFile !== null;
@@ -51,7 +70,7 @@ export default function Home() {
       <Header />
 
       <main className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-6 overflow-x-hidden">
-        {/* Upload section */}
+        {/* ── Upload section ─────────────────────────────────────── */}
         <section>
           <UploadZone
             videoFile={videoFile}
@@ -64,77 +83,107 @@ export default function Home() {
           />
         </section>
 
-        {/* Main content area */}
+        {/* ── Main content area ──────────────────────────────────── */}
         {hasFiles && (
-          <section className="flex flex-1 flex-col gap-6 lg:flex-row">
-            {/* Video Preview - takes 70% on desktop */}
-            <div className="flex-1 lg:flex-[7]">
-              <div className="sticky top-6">
-                <VideoPreview
-                  videoFile={videoFile}
-                  subtitles={subtitles}
-                  style={style}
-                />
-                {subtitles.length > 0 && (
-                  <div className="mt-3 flex items-center gap-2 text-xs text-white/30">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="16" x2="12" y2="12" />
-                      <line x1="12" y1="8" x2="12.01" y2="8" />
-                    </svg>
-                    {subtitles.length} subtitles loaded · Play video to preview
-                  </div>
-                )}
+          <>
+            <section className="flex flex-1 flex-col gap-6 lg:flex-row">
+              {/* Video Preview - takes 70% on desktop */}
+              <div className="flex-1 lg:flex-[7]">
+                <div className="sticky top-6">
+                  <VideoPreview
+                    ref={videoRef}
+                    videoFile={videoFile}
+                    subtitles={subtitles}
+                    style={style}
+                    aspectRatio={exportSettings.aspectRatio}
+                    onTimeUpdate={setCurrentTime}
+                    onDurationChange={setDuration}
+                  />
+                  {subtitles.length > 0 && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-white/30">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                      </svg>
+                      {subtitles.length} subtitles loaded · Play video to preview
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Sidebar - Controls + Export */}
-            <aside className="w-full shrink-0 lg:w-[350px]">
-              <div className="sticky top-6 space-y-6 rounded-2xl border border-white/5 bg-white/[0.02] p-5 backdrop-blur-sm">
-                <Tabs defaultValue="styles" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/5 p-1 rounded-lg">
-                    <TabsTrigger value="styles" className="rounded-md data-[state=active]:bg-violet-600 data-[state=active]:text-white">Styling</TabsTrigger>
-                    <TabsTrigger value="subtitles" className="rounded-md data-[state=active]:bg-violet-600 data-[state=active]:text-white">Subtitles Editor</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="styles" className="mt-0">
-                    <StyleControls
-                      style={style}
-                      onStyleChange={setStyle}
-                      disabled={isProcessing}
-                    />
-                  </TabsContent>
-                  
-                  <TabsContent value="subtitles" className="mt-0">
-                    <SubtitleEditor 
-                      subtitles={subtitles}
-                      onUpdateSubtitles={setSubtitles} 
-                      disabled={isProcessing} 
-                    />
-                  </TabsContent>
-                </Tabs>
+              {/* Sidebar - Styling + Export + Batch */}
+              <aside className="w-full shrink-0 lg:w-[350px]">
+                <div className="sticky top-6 space-y-6 rounded-2xl border border-white/5 bg-white/[0.02] p-5 backdrop-blur-sm">
+                  <Tabs defaultValue="styles" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3 mb-6 bg-white/5 p-1 rounded-lg">
+                      <TabsTrigger value="styles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                        Styling
+                      </TabsTrigger>
+                      <TabsTrigger value="export" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                        Export
+                      </TabsTrigger>
+                      <TabsTrigger value="batch" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                        Batch
+                      </TabsTrigger>
+                    </TabsList>
 
-                <ExportPanel
-                  videoFile={videoFile}
-                  subtitles={subtitles}
-                  style={style}
-                  disabled={isProcessing}
-                />
-              </div>
-            </aside>
-          </section>
+                    <TabsContent value="styles" className="mt-0">
+                      <StyleControls
+                        style={style}
+                        onStyleChange={setStyle}
+                        disabled={isProcessing}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="export" className="mt-0">
+                      <ExportPanel
+                        videoFile={videoFile}
+                        subtitles={subtitles}
+                        style={style}
+                        exportSettings={exportSettings}
+                        onExportSettingsChange={setExportSettings}
+                        disabled={isProcessing}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="batch" className="mt-0">
+                      <BatchPanel
+                        subtitles={subtitles}
+                        style={style}
+                        exportSettings={exportSettings}
+                        disabled={isProcessing}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </aside>
+            </section>
+
+            {/* ── Timeline Editor (full width, below video) ───────── */}
+            <section>
+              <TimelineEditor
+                subtitles={subtitles}
+                onUpdateSubtitles={setSubtitles}
+                duration={duration}
+                currentTime={currentTime}
+                onSeek={handleSeek}
+                disabled={isProcessing}
+              />
+            </section>
+          </>
         )}
 
-        {/* Empty state */}
+        {/* ── Empty state ────────────────────────────────────────── */}
         {!hasFiles && (
           <div className="flex flex-1 items-center justify-center py-20">
             <div className="text-center">

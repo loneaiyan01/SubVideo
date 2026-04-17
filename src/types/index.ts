@@ -31,7 +31,7 @@ export const AVAILABLE_FONTS = [
 ];
 
 export interface ExportState {
-  status: "idle" | "loading" | "processing" | "done" | "error";
+  status: "idle" | "loading" | "processing" | "muxing" | "done" | "error";
   progress: number;       // 0-100
   downloadUrl: string | null;
   error: string | null;
@@ -50,3 +50,46 @@ export const DEFAULT_STYLE: SubtitleStyle = {
   maxWidth: 85,
   fontFamily: "Poppins",
 };
+
+// ── Export Settings ──────────────────────────────────────────────────
+
+export type ResolutionOption = "original" | "1080p" | "720p";
+export type AspectRatioOption = "original" | "16:9" | "9:16" | "1:1";
+export type FormatOption = "webm" | "mp4";
+
+export interface ExportSettings {
+  resolution: ResolutionOption;
+  aspectRatio: AspectRatioOption;
+  format: FormatOption;
+}
+
+export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
+  resolution: "original",
+  aspectRatio: "original",
+  format: "webm",
+};
+
+export const RESOLUTION_MAP: Record<ResolutionOption, { w: number; h: number } | null> = {
+  original: null,
+  "1080p": { w: 1920, h: 1080 },
+  "720p": { w: 1280, h: 720 },
+};
+
+export const ASPECT_RATIO_MAP: Record<AspectRatioOption, number | null> = {
+  original: null,
+  "16:9": 16 / 9,
+  "9:16": 9 / 16,
+  "1:1": 1,
+};
+
+// ── Batch Export ─────────────────────────────────────────────────────
+
+export interface BatchItem {
+  id: string;
+  videoFile: File;
+  status: "queued" | "processing" | "done" | "error";
+  progress: number;
+  downloadUrl: string | null;
+  fileSize: number | null;
+  error: string | null;
+}
