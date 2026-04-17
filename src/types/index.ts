@@ -66,7 +66,7 @@ export interface ExportSettings {
 export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   resolution: "original",
   aspectRatio: "16:9",
-  format: "webm",
+  format: "mp4",
 };
 
 export const RESOLUTION_MAP: Record<ResolutionOption, { w: number; h: number } | null> = {
