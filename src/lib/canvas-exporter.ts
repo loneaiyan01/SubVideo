@@ -62,7 +62,7 @@ export async function exportWithCanvas(
       try {
         audioCtx = new AudioContext();
         const audioSource = audioCtx.createMediaElementSource(audioVideo);
-        const audioDest = audioCtx.createMediaStreamAudioDestination();
+        const audioDest = audioCtx.createMediaStreamDestination();
         audioSource.connect(audioDest);
         audioStream = audioDest.stream;
       } catch (e) {
