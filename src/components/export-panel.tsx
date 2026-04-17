@@ -85,6 +85,13 @@ export function ExportPanel({
   const handleExport = useCallback(async () => {
     if (!videoFile || subtitles.length === 0) return;
 
+    if (exportSettings.aspectRatio !== "16:9") {
+      toast("Feature coming soon In Sha Allah", {
+        description: "Only 16:9 exports are available in this version.",
+      });
+      return;
+    }
+
     try {
       // Phase 1: Loading
       setExportState({

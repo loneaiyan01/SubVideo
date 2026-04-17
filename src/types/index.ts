@@ -65,7 +65,7 @@ export interface ExportSettings {
 
 export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   resolution: "original",
-  aspectRatio: "original",
+  aspectRatio: "16:9",
   format: "webm",
 };
 
