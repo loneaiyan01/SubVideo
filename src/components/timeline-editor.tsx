@@ -64,6 +64,11 @@ export function TimelineEditor({
 
   const [pxPerSec, setPxPerSec] = useState(DEFAULT_PX_PER_SEC);
   const [scrollLeft, setScrollLeft] = useState(0);
+  
+  // Local state for fast dragging without re-rendering parent
+  const [localSubtitles, setLocalSubtitles] = useState<SubtitleCue[]>(subtitles);
+
+  // Sync local subtitles with parent, but ONLY when not dragging
   const [dragState, setDragState] = useState<{
     type: "move" | "resize-left" | "resize-right";
     cueIndex: number;
@@ -71,6 +76,13 @@ export function TimelineEditor({
     origStart: number;
     origEnd: number;
   } | null>(null);
+
+  useEffect(() => {
+    if (!dragState) {
+      setLocalSubtitles(subtitles);
+    }
+  }, [subtitles, dragState]);
+
   const [editingCueIndex, setEditingCueIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [hoveredCue, setHoveredCue] = useState<number | null>(null);
@@ -129,7 +141,7 @@ export function TimelineEditor({
     (e: React.MouseEvent, type: "move" | "resize-left" | "resize-right", idx: number) => {
       e.stopPropagation();
       if (disabled) return;
-      const cue = subtitles[idx];
+      const cue = localSubtitles[idx];
       setDragState({
         type,
         cueIndex: idx,
@@ -138,7 +150,7 @@ export function TimelineEditor({
         origEnd: cue.endTime,
       });
     },
-    [disabled, subtitles]
+    [disabled, localSubtitles]
   );
 
   useEffect(() => {
@@ -147,30 +159,43 @@ export function TimelineEditor({
     const handleMouseMove = (e: MouseEvent) => {
       const dx = e.clientX - dragState.startX;
       const dt = dx / pxPerSec;
-      const newSubs = [...subtitles];
-      const cue = { ...newSubs[dragState.cueIndex] };
+      setLocalSubtitles((prev) => {
+        const newSubs = [...prev];
+        const cue = { ...newSubs[dragState.cueIndex] };
 
-      if (dragState.type === "move") {
-        const dur = dragState.origEnd - dragState.origStart;
-        let newStart = snapTime(dragState.origStart + dt);
-        newStart = Math.max(0, Math.min(duration - dur, newStart));
-        cue.startTime = newStart;
-        cue.endTime = newStart + dur;
-      } else if (dragState.type === "resize-left") {
-        cue.startTime = snapTime(
-          Math.max(0, Math.min(dragState.origEnd - MIN_CUE_DURATION, dragState.origStart + dt))
-        );
-      } else if (dragState.type === "resize-right") {
-        cue.endTime = snapTime(
-          Math.max(dragState.origStart + MIN_CUE_DURATION, Math.min(duration, dragState.origEnd + dt))
-        );
-      }
+        if (dragState.type === "move") {
+          const dur = dragState.origEnd - dragState.origStart;
+          let newStart = snapTime(dragState.origStart + dt);
+          newStart = Math.max(0, Math.min(duration - dur, newStart));
+          cue.startTime = newStart;
+          cue.endTime = newStart + dur;
+        } else if (dragState.type === "resize-left") {
+          cue.startTime = snapTime(
+            Math.max(0, Math.min(dragState.origEnd - MIN_CUE_DURATION, dragState.origStart + dt))
+          );
+        } else if (dragState.type === "resize-right") {
+          cue.endTime = snapTime(
+            Math.max(dragState.origStart + MIN_CUE_DURATION, Math.min(duration, dragState.origEnd + dt))
+          );
+        }
 
-      newSubs[dragState.cueIndex] = cue;
-      onUpdateSubtitles(newSubs);
+        newSubs[dragState.cueIndex] = cue;
+        return newSubs;
+      });
     };
 
     const handleMouseUp = () => {
+      // Flush local state to parent
+      setLocalSubtitles((currentSubs) => {
+        // Sort subs strictly when dragged to prevent overlap/indexing issues
+        const sorted = [...currentSubs].sort((a, b) => a.startTime - b.startTime);
+        
+        // Re-index so they remain sequential
+        const rebuilt = sorted.map((s, i) => ({ ...s, index: i + 1 }));
+        
+        onUpdateSubtitles(rebuilt);
+        return rebuilt;
+      });
       setDragState(null);
     };
 
@@ -180,11 +205,11 @@ export function TimelineEditor({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [dragState, pxPerSec, subtitles, onUpdateSubtitles, duration]);
+  }, [dragState, pxPerSec, duration, onUpdateSubtitles]);
 
   // ── Add new subtitle ───────────────────────────────────────────
   const addSubtitle = useCallback(() => {
-    const newIndex = subtitles.length > 0 ? Math.max(...subtitles.map((c) => c.index)) + 1 : 1;
+    const newIndex = localSubtitles.length > 0 ? Math.max(...localSubtitles.map((c) => c.index)) + 1 : 1;
     const start = snapTime(currentTime);
     const end = snapTime(Math.min(start + 2, duration));
     const newCue: SubtitleCue = {
@@ -193,38 +218,38 @@ export function TimelineEditor({
       endTime: end,
       text: "New subtitle",
     };
-    onUpdateSubtitles([...subtitles, newCue].sort((a, b) => a.startTime - b.startTime));
-  }, [subtitles, currentTime, duration, onUpdateSubtitles]);
+    onUpdateSubtitles([...localSubtitles, newCue].sort((a, b) => a.startTime - b.startTime));
+  }, [localSubtitles, currentTime, duration, onUpdateSubtitles]);
 
   // ── Delete subtitle ────────────────────────────────────────────
   const deleteSubtitle = useCallback(
     (idx: number) => {
-      onUpdateSubtitles(subtitles.filter((_, i) => i !== idx));
+      onUpdateSubtitles(localSubtitles.filter((_, i) => i !== idx));
     },
-    [subtitles, onUpdateSubtitles]
+    [localSubtitles, onUpdateSubtitles]
   );
 
   // ── Inline editing ─────────────────────────────────────────────
   const startEditing = useCallback(
     (idx: number) => {
       setEditingCueIndex(idx);
-      setEditText(subtitles[idx].text);
+      setEditText(localSubtitles[idx].text);
     },
-    [subtitles]
+    [localSubtitles]
   );
 
   const commitEdit = useCallback(() => {
     if (editingCueIndex === null) return;
-    const newSubs = [...subtitles];
+    const newSubs = [...localSubtitles];
     newSubs[editingCueIndex] = { ...newSubs[editingCueIndex], text: editText };
     onUpdateSubtitles(newSubs);
     setEditingCueIndex(null);
-  }, [editingCueIndex, editText, subtitles, onUpdateSubtitles]);
+  }, [editingCueIndex, editText, localSubtitles, onUpdateSubtitles]);
 
   // ── Export SRT ───────────────────────────────────────────────
   const exportSRT = useCallback(() => {
-    if (subtitles.length === 0) return;
-    const srtData = serializeSRT(subtitles);
+    if (localSubtitles.length === 0) return;
+    const srtData = serializeSRT(localSubtitles);
     const blob = new Blob([srtData], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -384,7 +409,7 @@ export function TimelineEditor({
             style={{ height: TRACK_HEIGHT + WAVEFORM_HEIGHT + 16, paddingTop: RULER_HEIGHT + WAVEFORM_HEIGHT }}
             onClick={handleTrackClick}
           >
-            {subtitles.map((cue, idx) => {
+            {localSubtitles.map((cue, idx) => {
               const left = cue.startTime * pxPerSec;
               const width = Math.max((cue.endTime - cue.startTime) * pxPerSec, 8);
               const color = CUE_COLORS[idx % CUE_COLORS.length];
