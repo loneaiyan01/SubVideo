@@ -3,8 +3,6 @@
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { SubtitleCue, SubtitleStyle, ExportState } from "@/types";
-import { generateASS } from "@/lib/ass-generator";
-import { loadFFmpeg, burnSubtitles } from "@/lib/ffmpeg-worker";
 import { toast } from "sonner";
 
 interface ExportPanelProps {
@@ -21,18 +19,6 @@ function formatSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
-
-const FONT_DOWNLOAD_MAP: Record<string, string> = {
-  "Poppins": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf",
-  "Roboto": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/roboto/Roboto-Regular.ttf",
-  "Montserrat": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/montserrat/Montserrat-Regular.ttf",
-  "Inter": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/static/Inter-Regular.ttf",
-  "Bebas Neue": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bebasneue/BebasNeue-Regular.ttf",
-  "EB Garamond": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/ebgaramond/static/EBGaramond-Regular.ttf",
-  "Tinos": "https://cdn.jsdelivr.net/gh/google/fonts@main/apache/tinos/Tinos-Regular.ttf",
-  "Amiri": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/amiri/Amiri-Regular.ttf",
-  "Cairo": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/cairo/static/Cairo-Regular.ttf",
-};
 
 export function ExportPanel({
   videoFile,
@@ -55,7 +41,7 @@ export function ExportPanel({
     if (!videoFile || subtitles.length === 0) return;
 
     try {
-      // Phase 1: Load FFmpeg
+      // Phase 1: Loading
       setExportState({
         status: "loading",
         progress: 0,
@@ -64,52 +50,33 @@ export function ExportPanel({
         fileSize: null,
       });
 
-      toast.info("Loading FFmpeg engine...", {
-        description: "This may take a moment on first use.",
+      toast.info("Preparing export engine...", {
+        description: "Setting up canvas renderer.",
       });
 
-      await loadFFmpeg();
+      // Dynamically import the canvas exporter (code-split)
+      const { exportWithCanvas } = await import("@/lib/canvas-exporter");
 
-      // Phase 2: Generate ASS and process
+      // Phase 2: Processing
       setExportState((s) => ({ ...s, status: "processing" }));
 
-      const assContent = generateASS(subtitles, style);
-
-      // Fetch dynamic TTF font
-      let fontData: Uint8Array | null = null;
-      try {
-        const url = FONT_DOWNLOAD_MAP[style.fontFamily];
-        if (url) {
-          const fontResp = await fetch(url);
-          const fontBuf = await fontResp.arrayBuffer();
-          fontData = new Uint8Array(fontBuf);
-        } else {
-           throw new Error("Could not find TTF binary URL in FONT_DOWNLOAD_MAP");
-        }
-      } catch (err) {
-        console.warn(`Could not fetch custom font ${style.fontFamily}, using default`, err);
-      }
-
       toast.info("Processing video...", {
-        description: "Burning subtitles — this may take several minutes.",
+        description: "Burning subtitles — the video will play at full speed in the background.",
       });
 
-      const result = await burnSubtitles(
+      const blob = await exportWithCanvas(
         videoFile,
-        assContent,
-        fontData,
+        subtitles,
+        style,
         (progress) => {
           setExportState((s) => ({ ...s, progress }));
         },
         (msg) => {
-          console.log("[FFmpeg]", msg);
+          console.log("[CanvasExporter]", msg);
         }
       );
 
-      // Create download URL — copy to regular ArrayBuffer to satisfy TypeScript
-      const buffer = new ArrayBuffer(result.byteLength);
-      new Uint8Array(buffer).set(result);
-      const blob = new Blob([buffer], { type: "video/mp4" });
+      // Create download URL
       const url = URL.createObjectURL(blob);
 
       setExportState({
@@ -141,7 +108,8 @@ export function ExportPanel({
     if (exportState.downloadUrl) {
       const a = document.createElement("a");
       a.href = exportState.downloadUrl;
-      a.download = `subvideo_output_${Date.now()}.mp4`;
+      // Canvas exporter produces WebM
+      a.download = `subvideo_output_${Date.now()}.webm`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -200,10 +168,10 @@ export function ExportPanel({
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-violet-400 border-t-transparent" />
             <div>
               <p className="text-sm font-medium text-white/80">
-                Loading FFmpeg engine...
+                Preparing export engine...
               </p>
               <p className="text-xs text-white/40">
-                Downloading WASM binary (~30MB)
+                Setting up canvas renderer
               </p>
             </div>
           </div>
@@ -227,7 +195,7 @@ export function ExportPanel({
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
           </div>
           <p className="text-[11px] text-white/30">
-            Re-encoding video with burned-in subtitles...
+            Rendering subtitles onto video frames...
           </p>
         </div>
       )}
