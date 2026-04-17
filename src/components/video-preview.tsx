@@ -160,7 +160,7 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
           rel="stylesheet"
         />
         {/* Video container */}
-        <div style={{ containerType: "size" }} className="relative aspect-video w-full bg-black">
+        <div style={{ containerType: "size" }} className="relative aspect-video w-full bg-black max-h-[40vh] sm:max-h-none overflow-hidden rounded-xl sm:rounded-2xl border border-white/5 shadow-2xl">
           <video
             ref={videoRef}
             src={videoUrl}
@@ -169,7 +169,7 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
             onEnded={() => setIsPlaying(false)}
-            className="h-full w-full object-contain"
+            className="h-full w-full object-contain max-h-full"
             playsInline
             crossOrigin="anonymous"
           />

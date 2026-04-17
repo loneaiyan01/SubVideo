@@ -79,31 +79,32 @@ function DropZone({
 
   if (file) {
     return (
-      <div className="group relative flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition-all duration-300 hover:border-white/20 hover:bg-white/[0.05]">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-400">
+      <div className="group relative flex items-center gap-2 sm:gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-2.5 sm:p-4 transition-all duration-300 hover:border-white/20 hover:bg-white/[0.05]">
+        <div className="flex h-9 w-9 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-400 [&>svg]:w-4 [&>svg]:h-4 sm:[&>svg]:w-6 sm:[&>svg]:h-6">
           {icon}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-white/90">
+          <p className="truncate text-[11px] sm:text-sm font-medium text-white/90">
             {file.name}
           </p>
-          <p className="text-xs text-white/40">{formatSize(file.size)}</p>
+          <p className="text-[10px] sm:text-xs text-white/40">{formatSize(file.size)}</p>
         </div>
         <button
           onClick={onRemove}
           disabled={disabled}
-          className="shrink-0 rounded-lg p-2 text-white/30 transition-colors hover:bg-white/10 hover:text-red-400 disabled:opacity-50"
+          className="shrink-0 rounded-lg p-1.5 sm:p-2 text-white/30 transition-colors hover:bg-white/10 hover:text-red-400 disabled:opacity-50"
           aria-label={`Remove ${label}`}
         >
           <svg
-            width="16"
-            height="16"
+            width="14"
+            height="14"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="sm:w-4 sm:h-4"
           >
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
@@ -123,7 +124,7 @@ function DropZone({
       onDrop={handleDrop}
       onClick={() => !disabled && inputRef.current?.click()}
       className={`
-        group relative cursor-pointer rounded-2xl border-2 border-dashed p-6
+        group relative cursor-pointer rounded-2xl border-2 border-dashed p-4 sm:p-6
         transition-all duration-300
         ${
           dragOver
@@ -296,8 +297,8 @@ export function UploadZone({
                 sublabel=".srt subtitle file"
               />
             </TabsContent>
-            <TabsContent value="paste" className="mt-0 h-[196px] sm:h-[166px]">
-              <div className="flex flex-col gap-2 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] p-3 h-full">
+            <TabsContent value="paste" className="mt-0 h-[178px] sm:h-[196px]">
+              <div className="flex flex-col gap-2 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] p-2.5 sm:p-3 h-full">
                 <Textarea 
                   className="flex-1 resize-none bg-black/40 border-white/10 text-[11px] p-2 leading-relaxed text-white/70 font-mono custom-scrollbar"
                   placeholder={"1\n00:00:00,000 --> 00:00:02,000\nPaste your subtitle text here..."}
@@ -308,7 +309,7 @@ export function UploadZone({
                 <Button 
                   onClick={handlePasteSubmit} 
                   disabled={disabled || !pastedSrt.trim()}
-                  className="w-full text-xs h-8 bg-violet-600 hover:bg-violet-500 text-white border-0 transition-colors shrink-0"
+                  className="w-full text-xs h-10 bg-violet-600 hover:bg-violet-500 text-white font-semibold border-0 transition-colors shrink-0 shadow-lg shadow-violet-500/20"
                 >
                   Parse Subtitles
                 </Button>
