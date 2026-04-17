@@ -93,13 +93,6 @@ export function BatchPanel({
   const processQueue = useCallback(async () => {
     if (!canProcess) return;
 
-    if (exportSettings.aspectRatio !== "16:9") {
-      toast("Feature coming soon In Sha Allah", {
-        description: "Only 16:9 exports are available in this version.",
-      });
-      return;
-    }
-
     setIsProcessing(true);
     abortRef.current = false;
 
@@ -122,7 +115,7 @@ export function BatchPanel({
           item.videoFile,
           subtitles,
           style,
-          exportSettings,
+          { ...exportSettings, aspectRatio: "16:9" },
           (progress) => {
             setItems((prev) =>
               prev.map((it, idx) => (idx === i ? { ...it, progress } : it))

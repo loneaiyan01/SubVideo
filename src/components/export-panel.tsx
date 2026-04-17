@@ -85,13 +85,6 @@ export function ExportPanel({
   const handleExport = useCallback(async () => {
     if (!videoFile || subtitles.length === 0) return;
 
-    if (exportSettings.aspectRatio !== "16:9") {
-      toast("Feature coming soon In Sha Allah", {
-        description: "Only 16:9 exports are available in this version.",
-      });
-      return;
-    }
-
     try {
       // Phase 1: Loading
       setExportState({
@@ -230,15 +223,13 @@ export function ExportPanel({
           <div className="space-y-1.5">
             <label className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Aspect Ratio</label>
             <SegmentedControl<AspectRatioOption>
-              options={["original", "16:9", "9:16", "1:1"]}
-              value={exportSettings.aspectRatio}
-              onChange={(v) => onExportSettingsChange({ ...exportSettings, aspectRatio: v })}
-              labels={{ original: "Original", "16:9": "16:9", "9:16": "9:16", "1:1": "1:1" }}
+              options={["16:9"]}
+              value="16:9"
+              onChange={() => {}}
+              labels={{ "16:9": "16:9 (Exclusive)", "original": "", "9:16": "", "1:1": "" }}
             />
             <p className="text-[9px] text-white/20">
-              {exportSettings.aspectRatio === "9:16" && "Optimized for TikTok, Reels, Shorts"}
-              {exportSettings.aspectRatio === "1:1" && "Optimized for Instagram posts"}
-              {exportSettings.aspectRatio === "16:9" && "Standard widescreen format"}
+              Standard widescreen format (All exports restricted to 16:9)
             </p>
           </div>
 

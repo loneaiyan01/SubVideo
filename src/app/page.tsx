@@ -61,7 +61,7 @@ export default function Home() {
 
       <Header />
 
-      <main className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-3 sm:gap-6 p-3.5 sm:p-6 overflow-x-hidden">
+      <main className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 sm:gap-6 p-2 sm:p-6 overflow-x-hidden">
         {/* ── Upload section ─────────────────────────────────────── */}
         <section>
           <UploadZone
@@ -78,7 +78,7 @@ export default function Home() {
         {/* ── Main content area ──────────────────────────────────── */}
         {hasFiles && (
           <>
-            <section className={`flex flex-1 flex-col gap-6 ${isSidebarOpen ? 'lg:flex-row' : 'lg:flex-col'}`}>
+            <section className={`flex flex-1 flex-col gap-4 sm:gap-6 ${isSidebarOpen ? 'lg:flex-row' : 'lg:flex-col'}`}>
               {/* Video Preview - takes 70% on desktop */}
               <div className="flex-1 lg:flex-[7]">
                 <div className="sticky top-6">

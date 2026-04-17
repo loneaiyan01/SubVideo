@@ -5,13 +5,13 @@ import React from "react";
 export function Header() {
   return (
     <header className="relative z-10 border-b border-white/5 bg-black/40 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 sm:px-6 py-2 sm:py-4">
-        <div className="flex items-center gap-1.5 sm:gap-3">
+      <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Logo icon */}
-          <div className="flex h-7 w-7 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/20">
+          <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/20">
             <svg
-              width="16"
-              height="16"
+              width="18"
+              height="18"
               viewBox="0 0 24 24"
               fill="none"
               stroke="white"
@@ -31,10 +31,10 @@ export function Header() {
             </svg>
           </div>
           <div>
-            <h1 className="bg-gradient-to-r from-white via-violet-200 to-fuchsia-200 bg-clip-text text-base sm:text-xl font-bold tracking-tight text-transparent">
+            <h1 className="bg-gradient-to-r from-white via-violet-200 to-fuchsia-200 bg-clip-text text-lg sm:text-xl font-bold tracking-tight text-transparent">
               SubVideo
             </h1>
-            <p className="hidden sm:block text-[10px] font-medium tracking-wider text-white/40 uppercase">
+            <p className="text-[10px] font-medium tracking-wider text-white/40 uppercase">
               Subtitle Burner
             </p>
           </div>
