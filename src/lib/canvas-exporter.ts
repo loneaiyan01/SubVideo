@@ -212,14 +212,22 @@ function calculateDimensions(
   let canvasH = cropH;
 
   if (targetRes) {
-    // Scale to fit within target resolution, maintaining aspect
+    // If target is vertical, swap resolution boundaries for better quality
+    let tw = targetRes.w;
+    let th = targetRes.h;
+    if (targetRatio !== null && targetRatio < 1) {
+      tw = targetRes.h;
+      th = targetRes.w;
+    }
+
+    // Scale to fit within target resolution boundaries, maintaining aspect
     const cropRatio = cropW / cropH;
-    if (cropRatio > targetRes.w / targetRes.h) {
-      canvasW = targetRes.w;
-      canvasH = Math.round(targetRes.w / cropRatio);
+    if (cropRatio > tw / th) {
+      canvasW = tw;
+      canvasH = Math.round(tw / cropRatio);
     } else {
-      canvasH = targetRes.h;
-      canvasW = Math.round(targetRes.h * cropRatio);
+      canvasH = th;
+      canvasW = Math.round(th * cropRatio);
     }
     // Ensure even dimensions for codec compatibility
     canvasW = canvasW % 2 === 0 ? canvasW : canvasW + 1;

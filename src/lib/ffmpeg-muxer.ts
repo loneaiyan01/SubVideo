@@ -82,7 +82,8 @@ export async function convertToMP4(
     ret = await ff.exec([
       "-i", "input.webm",
       "-c:v", "libx264",
-      "-preset", "ultrafast",
+      "-preset", "veryfast",
+      "-pix_fmt", "yuv420p",
       "-crf", "23",
       "-c:a", "aac",
       "-b:a", "128k",

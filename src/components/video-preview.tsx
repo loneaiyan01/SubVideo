@@ -19,11 +19,7 @@ export interface VideoPreviewHandle {
   getDuration: () => number;
 }
 
-export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
-  function VideoPreview(
-    { videoFile, subtitles, style, aspectRatio, onTimeUpdate, onDurationChange },
-    ref
-  ) {
+export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: VideoPreviewProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     // Format font name for Google Fonts API
@@ -33,17 +29,6 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-
-    // Expose imperative methods to parent
-    useImperativeHandle(ref, () => ({
-      seekTo: (time: number) => {
-        if (videoRef.current) {
-          videoRef.current.currentTime = time;
-        }
-      },
-      getCurrentTime: () => videoRef.current?.currentTime ?? 0,
-      getDuration: () => videoRef.current?.duration ?? 0,
-    }));
 
     // Create object URL for video
     useEffect(() => {
@@ -62,17 +47,14 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
         const time = videoRef.current.currentTime;
         setCurrentTime(time);
         setActiveCue(getActiveCue(subtitles, time));
-        onTimeUpdate?.(time);
       }
-    }, [subtitles, onTimeUpdate]);
+    }, [subtitles]);
 
     const handleLoadedMetadata = useCallback(() => {
       if (videoRef.current) {
-        const dur = videoRef.current.duration;
-        setDuration(dur);
-        onDurationChange?.(dur);
+        setDuration(videoRef.current.duration);
       }
-    }, [onDurationChange]);
+    }, []);
 
     const togglePlay = useCallback(() => {
       if (videoRef.current) {
@@ -106,6 +88,17 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
 
     // ── Aspect ratio crop overlay calculation ────────────────────
     const targetRatio = ASPECT_RATIO_MAP[aspectRatio];
+    const containerRatio = 16 / 9;
+    let topOffset = 0;
+    let visibleHeight = 100;
+
+    if (targetRatio && targetRatio > containerRatio) {
+      // Target is wider than 16:9 — black bars top/bottom
+      visibleHeight = (containerRatio / targetRatio) * 100;
+      topOffset = (100 - visibleHeight) / 2;
+    }
+
+    const actualTop = topOffset + (style.positionY / 100) * visibleHeight;
     const showCropOverlay = targetRatio !== null && videoRef.current;
 
     // Subtitle overlay style
@@ -113,7 +106,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
       position: "absolute",
       left: "50%",
       transform: "translateX(-50%)",
-      top: `${style.positionY}%`,
+      top: `${actualTop}%`,
       fontSize: `${(style.fontSize / 1080) * 100}cqh`,
       color: style.fontColor,
       fontFamily: `"${style.fontFamily}", sans-serif`,
@@ -281,7 +274,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
       </div>
     );
   }
-);
+
 
 // ── Crop overlay component ───────────────────────────────────────────
 function CropOverlay({ ratio }: { ratio: number }) {

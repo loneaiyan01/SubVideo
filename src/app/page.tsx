@@ -27,10 +27,7 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Video timeline sync state
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const videoRef = useRef<VideoPreviewHandle>(null);
+
 
   const handleVideoUpload = useCallback((file: File) => {
     setVideoFile(file);
@@ -45,17 +42,11 @@ export default function Home() {
 
   const handleVideoRemove = useCallback(() => {
     setVideoFile(null);
-    setCurrentTime(0);
-    setDuration(0);
   }, []);
 
   const handleSrtRemove = useCallback(() => {
     setSrtFile(null);
     setSubtitles([]);
-  }, []);
-
-  const handleSeek = useCallback((time: number) => {
-    videoRef.current?.seekTo(time);
   }, []);
 
   const hasFiles = videoFile !== null || srtFile !== null;
@@ -70,7 +61,7 @@ export default function Home() {
 
       <Header />
 
-      <main className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-6 overflow-x-hidden">
+      <main className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 sm:gap-6 p-2 sm:p-6 overflow-x-hidden">
         {/* ── Upload section ─────────────────────────────────────── */}
         <section>
           <UploadZone
@@ -92,13 +83,10 @@ export default function Home() {
               <div className="flex-1 lg:flex-[7]">
                 <div className="sticky top-6">
                   <VideoPreview
-                    ref={videoRef}
                     videoFile={videoFile}
                     subtitles={subtitles}
                     style={style}
                     aspectRatio={exportSettings.aspectRatio}
-                    onTimeUpdate={setCurrentTime}
-                    onDurationChange={setDuration}
                   />
                   {subtitles.length > 0 && (
                     <div className="mt-3 flex items-center justify-between text-xs text-white/30">
