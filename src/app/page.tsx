@@ -7,7 +7,7 @@ import { VideoPreview, VideoPreviewHandle } from "@/components/video-preview";
 import { StyleControls } from "@/components/style-controls";
 import { ExportPanel } from "@/components/export-panel";
 import { BatchPanel } from "@/components/batch-panel";
-import { TimelineEditor } from "@/components/timeline-editor";
+import { SubtitleEditor } from "@/components/subtitle-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   SubtitleCue,
@@ -140,49 +140,70 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Sidebar - Styling + Export + Batch */}
+              {/* Sidebar - Subtitles & Editor Tools */}
               {isSidebarOpen && (
                 <aside className="w-full shrink-0 lg:w-[350px]">
                   <div className="sticky top-6 space-y-6 rounded-2xl border border-white/5 bg-white/[0.02] p-5 backdrop-blur-sm">
-                    <Tabs defaultValue="styles" className="w-full">
-                      <TabsList className="grid w-full grid-cols-3 mb-6 bg-white/5 p-1 rounded-lg">
-                        <TabsTrigger value="styles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                          Styling
+                    <Tabs defaultValue="subtitles" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/5 p-1 rounded-lg">
+                        <TabsTrigger value="subtitles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                          Subtitles
                         </TabsTrigger>
-                        <TabsTrigger value="export" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                          Export
-                        </TabsTrigger>
-                        <TabsTrigger value="batch" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                          Batch
+                        <TabsTrigger value="editor" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                          Editor Tools
                         </TabsTrigger>
                       </TabsList>
 
-                      <TabsContent value="styles" className="mt-0">
-                        <StyleControls
-                          style={style}
-                          onStyleChange={setStyle}
+                      <TabsContent value="subtitles" className="mt-0">
+                        <SubtitleEditor
+                          subtitles={subtitles}
+                          onUpdateSubtitles={setSubtitles}
                           disabled={isProcessing}
                         />
                       </TabsContent>
 
-                      <TabsContent value="export" className="mt-0">
-                        <ExportPanel
-                          videoFile={videoFile}
-                          subtitles={subtitles}
-                          style={style}
-                          exportSettings={exportSettings}
-                          onExportSettingsChange={setExportSettings}
-                          disabled={isProcessing}
-                        />
-                      </TabsContent>
+                      <TabsContent value="editor" className="mt-0">
+                        <Tabs defaultValue="styles" className="w-full">
+                          <TabsList className="grid w-full grid-cols-3 mb-6 bg-white/5 p-1 rounded-lg">
+                            <TabsTrigger value="styles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                              Styling
+                            </TabsTrigger>
+                            <TabsTrigger value="export" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                              Export
+                            </TabsTrigger>
+                            <TabsTrigger value="batch" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                              Batch
+                            </TabsTrigger>
+                          </TabsList>
 
-                      <TabsContent value="batch" className="mt-0">
-                        <BatchPanel
-                          subtitles={subtitles}
-                          style={style}
-                          exportSettings={exportSettings}
-                          disabled={isProcessing}
-                        />
+                          <TabsContent value="styles" className="mt-0">
+                            <StyleControls
+                              style={style}
+                              onStyleChange={setStyle}
+                              disabled={isProcessing}
+                            />
+                          </TabsContent>
+
+                          <TabsContent value="export" className="mt-0">
+                            <ExportPanel
+                              videoFile={videoFile}
+                              subtitles={subtitles}
+                              style={style}
+                              exportSettings={exportSettings}
+                              onExportSettingsChange={setExportSettings}
+                              disabled={isProcessing}
+                            />
+                          </TabsContent>
+
+                          <TabsContent value="batch" className="mt-0">
+                            <BatchPanel
+                              subtitles={subtitles}
+                              style={style}
+                              exportSettings={exportSettings}
+                              disabled={isProcessing}
+                            />
+                          </TabsContent>
+                        </Tabs>
                       </TabsContent>
                     </Tabs>
                   </div>
@@ -190,17 +211,7 @@ export default function Home() {
               )}
             </section>
 
-            {/* ── Timeline Editor (full width, below video) ───────── */}
-            <section>
-              <TimelineEditor
-                subtitles={subtitles}
-                onUpdateSubtitles={setSubtitles}
-                duration={duration}
-                currentTime={currentTime}
-                onSeek={handleSeek}
-                disabled={isProcessing}
-              />
-            </section>
+
           </>
         )}
 
