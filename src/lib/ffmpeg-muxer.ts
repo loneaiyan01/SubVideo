@@ -62,38 +62,23 @@ export async function convertToMP4(
     }
   });
 
-  // Try stream copy first (fastest)
-  let ret = await ff.exec([
+  // Always re-encode to H.264 baseline + AAC for universal compatibility (especially iOS)
+  const ret = await ff.exec([
     "-i", "input.webm",
-    "-c", "copy",
+    "-c:v", "libx264",
+    "-profile:v", "baseline",
+    "-level", "3.1",
+    "-preset", "veryfast",
+    "-pix_fmt", "yuv420p",
+    "-crf", "23",
+    "-c:a", "aac",
+    "-b:a", "128k",
     "-movflags", "+faststart",
     "output.mp4",
   ]);
 
   if (ret !== 0) {
-    console.warn("FFmpeg stream copy failed, falling back to re-encoding...");
-    // Fall back to re-encoding
-    try {
-      await ff.deleteFile("output.mp4");
-    } catch { 
-      // ignore
-    }
-
-    ret = await ff.exec([
-      "-i", "input.webm",
-      "-c:v", "libx264",
-      "-preset", "veryfast",
-      "-pix_fmt", "yuv420p",
-      "-crf", "23",
-      "-c:a", "aac",
-      "-b:a", "128k",
-      "-movflags", "+faststart",
-      "output.mp4",
-    ]);
-
-    if (ret !== 0) {
-      throw new Error(`FFmpeg MP4 conversion failed with exit code ${ret}`);
-    }
+    throw new Error(`FFmpeg MP4 conversion failed with exit code ${ret}`);
   }
 
   onProgress(90);
