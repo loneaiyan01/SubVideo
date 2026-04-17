@@ -102,5 +102,5 @@ export async function convertToMP4(
   onProgress(100);
 
   const mp4Data = data instanceof Uint8Array ? data : new TextEncoder().encode(data as string);
-  return new Blob([mp4Data], { type: "video/mp4" });
+  return new Blob([mp4Data as unknown as BlobPart], { type: "video/mp4" });
 }
