@@ -25,6 +25,7 @@ export default function Home() {
   const [style, setStyle] = useState<SubtitleStyle>(DEFAULT_STYLE);
   const [exportSettings, setExportSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Video timeline sync state
   const [currentTime, setCurrentTime] = useState(0);
@@ -86,7 +87,7 @@ export default function Home() {
         {/* ── Main content area ──────────────────────────────────── */}
         {hasFiles && (
           <>
-            <section className="flex flex-1 flex-col gap-6 lg:flex-row">
+            <section className={`flex flex-1 flex-col gap-6 ${isSidebarOpen ? 'lg:flex-row' : 'lg:flex-col'}`}>
               {/* Video Preview - takes 70% on desktop */}
               <div className="flex-1 lg:flex-[7]">
                 <div className="sticky top-6">
@@ -100,73 +101,93 @@ export default function Home() {
                     onDurationChange={setDuration}
                   />
                   {subtitles.length > 0 && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-white/30">
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                    <div className="mt-3 flex items-center justify-between text-xs text-white/30">
+                      <div className="flex items-center gap-2">
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="16" x2="12" y2="12" />
+                          <line x1="12" y1="8" x2="12.01" y2="8" />
+                        </svg>
+                        {subtitles.length} subtitles loaded
+                      </div>
+                      <button
+                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                        className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
                       >
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="16" x2="12" y2="12" />
-                        <line x1="12" y1="8" x2="12.01" y2="8" />
-                      </svg>
-                      {subtitles.length} subtitles loaded · Play video to preview
+                        {isSidebarOpen ? (
+                          <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+                            Hide Editor Menu
+                          </>
+                        ) : (
+                          <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><polyline points="12 5 19 12 12 19"/></svg>
+                            Show Editor Menu
+                          </>
+                        )}
+                      </button>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Sidebar - Styling + Export + Batch */}
-              <aside className="w-full shrink-0 lg:w-[350px]">
-                <div className="sticky top-6 space-y-6 rounded-2xl border border-white/5 bg-white/[0.02] p-5 backdrop-blur-sm">
-                  <Tabs defaultValue="styles" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 mb-6 bg-white/5 p-1 rounded-lg">
-                      <TabsTrigger value="styles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                        Styling
-                      </TabsTrigger>
-                      <TabsTrigger value="export" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                        Export
-                      </TabsTrigger>
-                      <TabsTrigger value="batch" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                        Batch
-                      </TabsTrigger>
-                    </TabsList>
+              {isSidebarOpen && (
+                <aside className="w-full shrink-0 lg:w-[350px]">
+                  <div className="sticky top-6 space-y-6 rounded-2xl border border-white/5 bg-white/[0.02] p-5 backdrop-blur-sm">
+                    <Tabs defaultValue="styles" className="w-full">
+                      <TabsList className="grid w-full grid-cols-3 mb-6 bg-white/5 p-1 rounded-lg">
+                        <TabsTrigger value="styles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                          Styling
+                        </TabsTrigger>
+                        <TabsTrigger value="export" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                          Export
+                        </TabsTrigger>
+                        <TabsTrigger value="batch" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                          Batch
+                        </TabsTrigger>
+                      </TabsList>
 
-                    <TabsContent value="styles" className="mt-0">
-                      <StyleControls
-                        style={style}
-                        onStyleChange={setStyle}
-                        disabled={isProcessing}
-                      />
-                    </TabsContent>
+                      <TabsContent value="styles" className="mt-0">
+                        <StyleControls
+                          style={style}
+                          onStyleChange={setStyle}
+                          disabled={isProcessing}
+                        />
+                      </TabsContent>
 
-                    <TabsContent value="export" className="mt-0">
-                      <ExportPanel
-                        videoFile={videoFile}
-                        subtitles={subtitles}
-                        style={style}
-                        exportSettings={exportSettings}
-                        onExportSettingsChange={setExportSettings}
-                        disabled={isProcessing}
-                      />
-                    </TabsContent>
+                      <TabsContent value="export" className="mt-0">
+                        <ExportPanel
+                          videoFile={videoFile}
+                          subtitles={subtitles}
+                          style={style}
+                          exportSettings={exportSettings}
+                          onExportSettingsChange={setExportSettings}
+                          disabled={isProcessing}
+                        />
+                      </TabsContent>
 
-                    <TabsContent value="batch" className="mt-0">
-                      <BatchPanel
-                        subtitles={subtitles}
-                        style={style}
-                        exportSettings={exportSettings}
-                        disabled={isProcessing}
-                      />
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              </aside>
+                      <TabsContent value="batch" className="mt-0">
+                        <BatchPanel
+                          subtitles={subtitles}
+                          style={style}
+                          exportSettings={exportSettings}
+                          disabled={isProcessing}
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                </aside>
+              )}
             </section>
 
             {/* ── Timeline Editor (full width, below video) ───────── */}
