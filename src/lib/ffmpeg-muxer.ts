@@ -4,8 +4,8 @@ import { toBlobURL } from "@ffmpeg/util";
 let ffmpeg: FFmpeg | null = null;
 
 /**
- * Load FFmpeg WASM for container muxing only.
- * Uses single-threaded core — no libass needed.
+ * Load FFmpeg WASM for container muxing / re-encoding.
+ * Uses single-threaded core.
  */
 async function loadFFmpeg(): Promise<FFmpeg> {
   if (ffmpeg && ffmpeg.loaded) return ffmpeg;
@@ -28,6 +28,9 @@ async function loadFFmpeg(): Promise<FFmpeg> {
 function setupProgress(ff: FFmpeg, onProgress: (pct: number) => void) {
   let duration = 0;
   ff.on("log", ({ message }) => {
+    // Also log to console for debugging
+    console.log("[FFmpeg]", message);
+
     const durMatch = message.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
     if (durMatch) {
       duration =
@@ -51,8 +54,21 @@ function setupProgress(ff: FFmpeg, onProgress: (pct: number) => void) {
 }
 
 /**
+ * Common encoding args for MPEG-4 Part 2 + AAC.
+ * Uses the built-in mpeg4 encoder which is lightweight in WASM
+ * and produces universally playable video on ALL devices (iOS, Android, PC, Mac).
+ */
+const ENCODE_ARGS = [
+  "-c:v", "mpeg4",      // Built-in encoder, fast in WASM
+  "-q:v", "4",           // Quality scale (1=best, 31=worst, 4=very good)
+  "-pix_fmt", "yuv420p", // Universal pixel format
+  "-c:a", "aac",         // AAC audio
+  "-b:a", "128k",
+];
+
+/**
  * Convert a WebM blob to MP4 using FFmpeg WASM.
- * Re-encodes to H.264 baseline + AAC for universal compatibility.
+ * Re-encodes video to MPEG-4 + AAC for universal compatibility.
  */
 export async function convertToMP4(
   webmBlob: Blob,
@@ -66,17 +82,9 @@ export async function convertToMP4(
   onProgress(10);
   setupProgress(ff, onProgress);
 
-  // Re-encode to H.264 baseline + AAC
   const ret = await ff.exec([
     "-i", "input.webm",
-    "-c:v", "libx264",
-    "-profile:v", "baseline",
-    "-level", "3.1",
-    "-preset", "veryfast",
-    "-pix_fmt", "yuv420p",
-    "-crf", "23",
-    "-c:a", "aac",
-    "-b:a", "128k",
+    ...ENCODE_ARGS,
     "-movflags", "+faststart",
     "output.mp4",
   ]);
@@ -101,7 +109,7 @@ export async function convertToMP4(
 
 /**
  * Convert a WebM blob to MOV (QuickTime) using FFmpeg WASM.
- * Uses H.264 baseline + AAC in a QuickTime container for native Apple playback.
+ * Re-encodes to MPEG-4 + AAC in a QuickTime container for native Apple playback.
  */
 export async function convertToMOV(
   webmBlob: Blob,
@@ -115,17 +123,9 @@ export async function convertToMOV(
   onProgress(10);
   setupProgress(ff, onProgress);
 
-  // Re-encode to H.264 baseline + AAC inside a QuickTime MOV container
   const ret = await ff.exec([
     "-i", "input.webm",
-    "-c:v", "libx264",
-    "-profile:v", "baseline",
-    "-level", "3.1",
-    "-preset", "veryfast",
-    "-pix_fmt", "yuv420p",
-    "-crf", "23",
-    "-c:a", "aac",
-    "-b:a", "128k",
+    ...ENCODE_ARGS,
     "-f", "mov",
     "output.mov",
   ]);
