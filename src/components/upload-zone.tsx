@@ -279,7 +279,7 @@ export function UploadZone({
             sublabel=".srt subtitle file"
           />
         ) : (
-          <Tabs defaultValue="upload" className="w-full h-full flex flex-col">
+          <Tabs defaultValue="paste" className="w-full h-full flex flex-col">
             <TabsList className="grid w-full grid-cols-2 mb-2 bg-white/5 p-1 rounded-lg">
               <TabsTrigger value="upload" className="rounded-md text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white">Upload .SRT File</TabsTrigger>
               <TabsTrigger value="paste" className="rounded-md text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white">Paste Raw Text</TabsTrigger>
