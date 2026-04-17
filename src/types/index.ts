@@ -55,7 +55,7 @@ export const DEFAULT_STYLE: SubtitleStyle = {
 
 export type ResolutionOption = "original" | "1080p" | "720p";
 export type AspectRatioOption = "original" | "16:9" | "9:16" | "1:1";
-export type FormatOption = "webm" | "mp4" | "mov";
+export type FormatOption = "mp4";
 
 export interface ExportSettings {
   resolution: ResolutionOption;

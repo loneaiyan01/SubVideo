@@ -122,33 +122,18 @@ export function ExportPanel({
         }
       );
 
-      // Phase 3: Muxing to final format
-      let finalBlob = blob;
-      let fileExtension = "webm";
+      // Phase 3: MP4 muxing
+      setExportState((s) => ({ ...s, status: "muxing", progress: 0 }));
 
-      const format = exportSettings.format;
-      if (format === "mp4" || format === "mov") {
-        setExportState((s) => ({ ...s, status: "muxing", progress: 0 }));
+      toast.info("Converting to MP4...", {
+        description: "Remuxing video container — almost done.",
+      });
 
-        const containerLabel = format === "mov" ? "MOV (QuickTime)" : "MP4";
-        toast.info(`Converting to ${containerLabel}...`, {
-          description: "Re-encoding video — almost done.",
-        });
-
-        if (format === "mov") {
-          const { convertToMOV } = await import("@/lib/ffmpeg-muxer");
-          finalBlob = await convertToMOV(blob, (progress) => {
-            setExportState((s) => ({ ...s, progress }));
-          });
-          fileExtension = "mov";
-        } else {
-          const { convertToMP4 } = await import("@/lib/ffmpeg-muxer");
-          finalBlob = await convertToMP4(blob, (progress) => {
-            setExportState((s) => ({ ...s, progress }));
-          });
-          fileExtension = "mp4";
-        }
-      }
+      const { convertToMP4 } = await import("@/lib/ffmpeg-muxer");
+      const finalBlob = await convertToMP4(blob, (progress) => {
+        setExportState((s) => ({ ...s, progress }));
+      });
+      const fileExtension = "mp4";
 
       // Create download URL
       const url = URL.createObjectURL(finalBlob);
@@ -182,8 +167,7 @@ export function ExportPanel({
     if (exportState.downloadUrl) {
       const a = document.createElement("a");
       a.href = exportState.downloadUrl;
-      const ext = exportSettings.format === "mov" ? "mov" : "mp4";
-      a.download = `subvideo_output_${Date.now()}.${ext}`;
+      a.download = `subvideo_output_${Date.now()}.mp4`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -246,16 +230,13 @@ export function ExportPanel({
           {/* Format */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Format</label>
-            <SegmentedControl<FormatOption>
-              options={["mp4", "mov"]}
-              value={exportSettings.format}
-              onChange={(v) => onExportSettingsChange({ ...exportSettings, format: v })}
-              labels={{ mp4: "MP4 (Android/PC)", mov: "MOV (Apple)", webm: "" }}
-            />
+            <div className="flex rounded-lg bg-white/5 p-0.5">
+              <div className="flex-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium bg-violet-600 text-white shadow-sm shadow-violet-500/20 text-center">
+                MP4 (H.264/AAC)
+              </div>
+            </div>
             <p className="text-[9px] text-white/20">
-              {exportSettings.format === "mov"
-                ? "QuickTime format — native Apple playback (iPhone, iPad, Mac)"
-                : "Universal H.264/AAC — plays on Android, Windows, web"}
+              Universal format — plays on all devices
             </p>
           </div>
         </div>

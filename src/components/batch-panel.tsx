@@ -123,20 +123,18 @@ export function BatchPanel({
           }
         );
 
-        // MP4 muxing if selected
-        if (exportSettings.format === "mp4") {
+        // Convert to MP4 (now the only supported format)
+        setItems((prev) =>
+          prev.map((it, idx) =>
+            idx === i ? { ...it, progress: 0 } : it
+          )
+        );
+        const { convertToMP4 } = await import("@/lib/ffmpeg-muxer");
+        blob = await convertToMP4(blob, (progress) => {
           setItems((prev) =>
-            prev.map((it, idx) =>
-              idx === i ? { ...it, progress: 0 } : it
-            )
+            prev.map((it, idx) => (idx === i ? { ...it, progress } : it))
           );
-          const { convertToMP4 } = await import("@/lib/ffmpeg-muxer");
-          blob = await convertToMP4(blob, (progress) => {
-            setItems((prev) =>
-              prev.map((it, idx) => (idx === i ? { ...it, progress } : it))
-            );
-          });
-        }
+        });
 
         const url = URL.createObjectURL(blob);
         setItems((prev) =>
