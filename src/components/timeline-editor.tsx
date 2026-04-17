@@ -138,14 +138,15 @@ export function TimelineEditor({
 
   // ── Drag handlers ──────────────────────────────────────────────
   const startDrag = useCallback(
-    (e: React.MouseEvent, type: "move" | "resize-left" | "resize-right", idx: number) => {
+    (e: React.MouseEvent | React.TouchEvent, type: "move" | "resize-left" | "resize-right", idx: number) => {
       e.stopPropagation();
       if (disabled) return;
+      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
       const cue = localSubtitles[idx];
       setDragState({
         type,
         cueIndex: idx,
-        startX: e.clientX,
+        startX: clientX,
         origStart: cue.startTime,
         origEnd: cue.endTime,
       });
@@ -156,8 +157,9 @@ export function TimelineEditor({
   useEffect(() => {
     if (!dragState) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const dx = e.clientX - dragState.startX;
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = "touches" in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+      const dx = clientX - dragState.startX;
       const dt = dx / pxPerSec;
       setLocalSubtitles((prev) => {
         const newSubs = [...prev];
@@ -184,7 +186,7 @@ export function TimelineEditor({
       });
     };
 
-    const handleMouseUp = () => {
+    const handleUp = () => {
       // Flush local state to parent
       setLocalSubtitles((currentSubs) => {
         // Sort subs strictly when dragged to prevent overlap/indexing issues
@@ -199,11 +201,15 @@ export function TimelineEditor({
       setDragState(null);
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("touchend", handleUp);
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("touchend", handleUp);
     };
   }, [dragState, pxPerSec, duration, onUpdateSubtitles]);
 
@@ -442,12 +448,14 @@ export function TimelineEditor({
                   <div
                     className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-white/20 rounded-l-md"
                     onMouseDown={(e) => startDrag(e, "resize-left", idx)}
+                    onTouchStart={(e) => startDrag(e, "resize-left", idx)}
                   />
 
                   {/* Center drag area */}
                   <div
                     className="absolute inset-0 mx-2 cursor-grab active:cursor-grabbing flex items-center overflow-hidden"
                     onMouseDown={(e) => startDrag(e, "move", idx)}
+                    onTouchStart={(e) => startDrag(e, "move", idx)}
                   >
                     {isEditing ? (
                       <input
@@ -461,6 +469,7 @@ export function TimelineEditor({
                         }}
                         onClick={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
                         className="w-full bg-transparent text-[10px] text-white font-medium outline-none px-1"
                       />
                     ) : (
@@ -474,6 +483,7 @@ export function TimelineEditor({
                   <div
                     className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-white/20 rounded-r-md"
                     onMouseDown={(e) => startDrag(e, "resize-right", idx)}
+                    onTouchStart={(e) => startDrag(e, "resize-right", idx)}
                   />
 
                   {/* Delete button */}

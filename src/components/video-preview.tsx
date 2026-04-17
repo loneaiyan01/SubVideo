@@ -114,7 +114,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
       left: "50%",
       transform: "translateX(-50%)",
       top: `${style.positionY}%`,
-      fontSize: `${style.fontSize}px`,
+      fontSize: `${(style.fontSize / 1080) * 100}cqh`,
       color: style.fontColor,
       fontFamily: `"${style.fontFamily}", sans-serif`,
       fontWeight: 700,
@@ -134,7 +134,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
       whiteSpace: "pre-line",
       pointerEvents: "none",
       zIndex: 10,
-      transition: "all 0.15s ease",
+      transition: "all 0.1s ease",
     };
 
     if (!videoUrl) {
@@ -167,7 +167,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
           rel="stylesheet"
         />
         {/* Video container */}
-        <div className="relative aspect-video w-full bg-black">
+        <div style={{ containerType: "size" }} className="relative aspect-video w-full bg-black">
           <video
             ref={videoRef}
             src={videoUrl}
