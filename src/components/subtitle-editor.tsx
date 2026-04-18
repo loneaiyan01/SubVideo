@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
+import { serializeSRT } from "@/lib/srt-parser";
 
 interface SubtitleEditorProps {
   subtitles: SubtitleCue[];
@@ -46,28 +47,63 @@ export function SubtitleEditor({
     return `${mins}:${secs.padStart(4, "0")}s`;
   };
 
+  const handleExportSRT = () => {
+    if (subtitles.length === 0) return;
+    const srtContent = serializeSRT(subtitles);
+    const blob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `subtitles_${Date.now()}.srt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className={`flex flex-col h-full gap-5 ${disabled ? "pointer-events-none opacity-50" : ""}`}>
-      {/* Time Shift Utility */}
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-        <h3 className="text-sm font-semibold text-white/90 mb-2">Sync Fixer</h3>
-        <p className="text-xs text-white/40 mb-3">
-          Shift all subtitle timestamps forward or backward simultaneously.
-        </p>
-        <div className="flex gap-2">
-          <Input 
-            type="number" 
-            placeholder="e.g. 500 or -1000" 
-            value={shiftMs || ""} 
-            onChange={(e) => setShiftMs(Number(e.target.value))}
-            className="h-9 bg-black/20 text-white border-white/10 text-xs"
-          />
+      {/* Utilities */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Time Shift Utility */}
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 flex flex-col">
+          <h3 className="text-sm font-semibold text-white/90 mb-2">Sync Fixer</h3>
+          <p className="text-xs text-white/40 mb-3 flex-1">
+            Shift all subtitle timestamps forward or backward simultaneously.
+          </p>
+          <div className="flex gap-2 mt-auto">
+            <Input 
+              type="number" 
+              placeholder="e.g. 500 or -1000" 
+              value={shiftMs || ""} 
+              onChange={(e) => setShiftMs(Number(e.target.value))}
+              className="h-9 bg-black/20 text-white border-white/10 text-xs"
+            />
+            <Button 
+              variant="secondary" 
+              className="h-9 w-24 shrink-0 text-xs bg-white/10 hover:bg-white/20 text-white border-0"
+              onClick={applySyncShift}
+            >
+              Shift (ms)
+            </Button>
+          </div>
+        </div>
+
+        {/* Export Subtitles Utility */}
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 flex flex-col">
+          <h3 className="text-sm font-semibold text-white/90 mb-2">Export Subtitles</h3>
+          <p className="text-xs text-white/40 mb-3 flex-1">
+            Download the modified subtitles directly as an SRT file.
+          </p>
           <Button 
             variant="secondary" 
-            className="h-9 w-24 shrink-0 text-xs bg-white/10 hover:bg-white/20 text-white border-0"
-            onClick={applySyncShift}
+            className="h-9 w-full text-xs bg-white/10 hover:bg-white/20 text-white border-0 mt-auto flex gap-2 items-center justify-center transition-colors"
+            onClick={handleExportSRT}
+            disabled={subtitles.length === 0}
+            title="Download SRT"
           >
-            Shift (ms)
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+            Download .SRT
           </Button>
         </div>
       </div>
