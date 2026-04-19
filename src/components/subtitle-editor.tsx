@@ -49,15 +49,7 @@ export function SubtitleEditor({
 
   const handleExportSRT = () => {
     if (subtitles.length === 0) return;
-    
-    // Shift timestamps by 1 hour (3600 seconds) for the exported SRT
-    const shiftedSubtitles = subtitles.map(cue => ({
-      ...cue,
-      startTime: cue.startTime + 3600,
-      endTime: cue.endTime + 3600
-    }));
-
-    const srtContent = serializeSRT(shiftedSubtitles);
+    const srtContent = serializeSRT(subtitles);
     const blob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
