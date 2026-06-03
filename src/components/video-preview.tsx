@@ -21,6 +21,8 @@ export interface VideoPreviewHandle {
 
 export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: VideoPreviewProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Format font name for Google Fonts API
     const googleFontName = style.fontFamily.replace(/\s+/g, "+");
@@ -29,6 +31,10 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [playbackRate, setPlaybackRate] = useState(1.0);
+    const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showControls, setShowControls] = useState(true);
 
     // Create object URL for video
     useEffect(() => {
@@ -40,6 +46,24 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
         setVideoUrl(null);
       }
     }, [videoFile]);
+
+    // Synchronize playback rate
+    useEffect(() => {
+      if (videoRef.current) {
+        videoRef.current.playbackRate = playbackRate;
+      }
+    }, [playbackRate, videoUrl]);
+
+    // Sync fullscreen state
+    useEffect(() => {
+      const handleFullscreenChange = () => {
+        setIsFullscreen(document.fullscreenElement === containerRef.current);
+      };
+      document.addEventListener("fullscreenchange", handleFullscreenChange);
+      return () => {
+        document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      };
+    }, []);
 
     // Track current time and find active subtitle
     const handleTimeUpdate = useCallback(() => {
@@ -53,8 +77,9 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
     const handleLoadedMetadata = useCallback(() => {
       if (videoRef.current) {
         setDuration(videoRef.current.duration);
+        videoRef.current.playbackRate = playbackRate;
       }
-    }, []);
+    }, [playbackRate]);
 
     const togglePlay = useCallback(() => {
       if (videoRef.current) {
@@ -79,6 +104,86 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
       },
       [duration]
     );
+
+    const toggleFullscreen = useCallback(() => {
+      if (!containerRef.current) return;
+
+      if (!document.fullscreenElement) {
+        containerRef.current.requestFullscreen().catch((err) => {
+          console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+      } else {
+        document.exitFullscreen().catch((err) => {
+          console.error(`Error attempting to exit fullscreen: ${err.message}`);
+        });
+      }
+    }, []);
+
+    const handleMouseMove = useCallback(() => {
+      if (!isFullscreen) {
+        setShowControls(true);
+        return;
+      }
+      setShowControls(true);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 2000);
+    }, [isFullscreen]);
+
+    useEffect(() => {
+      if (isFullscreen) {
+        window.addEventListener("mousemove", handleMouseMove);
+        handleMouseMove();
+      } else {
+        window.removeEventListener("mousemove", handleMouseMove);
+        setShowControls(true);
+        if (controlsTimeoutRef.current) {
+          clearTimeout(controlsTimeoutRef.current);
+        }
+      }
+      return () => {
+        window.removeEventListener("mousemove", handleMouseMove);
+        if (controlsTimeoutRef.current) {
+          clearTimeout(controlsTimeoutRef.current);
+        }
+      };
+    }, [isFullscreen, handleMouseMove]);
+
+    const handleKeyDown = useCallback(
+      (e: KeyboardEvent) => {
+        if (!videoRef.current || !videoUrl) return;
+
+        // Skip if user is typing in inputs or textareas
+        const active = document.activeElement as HTMLElement | null;
+        if (
+          active &&
+          (active.tagName === "INPUT" ||
+            active.tagName === "TEXTAREA" ||
+            active.isContentEditable)
+        ) {
+          return;
+        }
+
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5);
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          videoRef.current.currentTime = Math.min(duration, videoRef.current.currentTime + 5);
+        }
+      },
+      [duration, videoUrl]
+    );
+
+    useEffect(() => {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }, [handleKeyDown]);
 
     const formatTime = (t: number) => {
       const m = Math.floor(t / 60);
@@ -153,14 +258,29 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
     }
 
     return (
-      <div className="flex flex-col h-full overflow-hidden bg-black/40 rounded-xl border border-white/5">
+      <div
+        ref={containerRef}
+        onMouseMove={handleMouseMove}
+        className={`flex flex-col overflow-hidden bg-black/40 rounded-xl border border-white/5 transition-all duration-300 ${
+          isFullscreen
+            ? "fixed inset-0 z-50 w-screen h-screen bg-black rounded-none border-none"
+            : "h-full"
+        } ${isFullscreen && !showControls ? "cursor-none" : ""}`}
+      >
         {/* Inject dynamic Google Font */}
         <link
           href={`https://fonts.googleapis.com/css2?family=${googleFontName}:wght@400;700&display=swap`}
           rel="stylesheet"
         />
         {/* Video container */}
-        <div style={{ containerType: "size" }} className="relative aspect-video w-full max-h-[500px] bg-black mx-auto overflow-hidden">
+        <div
+          style={{ containerType: "size" }}
+          className={`relative bg-black mx-auto overflow-hidden transition-all duration-300 ${
+            isFullscreen
+              ? "flex-1 w-full max-h-none flex items-center justify-center"
+              : "aspect-video w-full max-h-[500px]"
+          }`}
+        >
           <video
             ref={videoRef}
             src={videoUrl}
@@ -189,12 +309,16 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
           {/* Play/pause overlay */}
           <button
             onClick={togglePlay}
-            className="absolute inset-0 flex items-center justify-center bg-transparent transition-all group"
+            className={`absolute inset-0 flex items-center justify-center bg-transparent transition-all group ${
+              isFullscreen && !showControls ? "pointer-events-none" : ""
+            }`}
             aria-label={isPlaying ? "Pause" : "Play"}
           >
             <div
               className={`flex h-16 w-16 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm
-                transition-all duration-200 ${isPlaying ? "opacity-0 group-hover:opacity-100" : "opacity-100"}`}
+                transition-all duration-200 ${
+                  isPlaying ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+                } ${isFullscreen && !showControls ? "hidden" : ""}`}
             >
               {isPlaying ? (
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
@@ -211,14 +335,24 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
 
           {/* Aspect ratio badge */}
           {aspectRatio !== "original" && (
-            <div className="absolute top-3 right-3 rounded-md bg-black/60 px-2 py-1 text-[10px] font-semibold text-white/70 backdrop-blur-sm border border-white/10">
+            <div
+              className={`absolute top-3 right-3 rounded-md bg-black/60 px-2 py-1 text-[10px] font-semibold text-white/70 backdrop-blur-sm border border-white/10 transition-opacity duration-300 ${
+                isFullscreen && !showControls ? "opacity-0" : "opacity-100"
+              }`}
+            >
               {aspectRatio}
             </div>
           )}
         </div>
 
         {/* Controls bar */}
-        <div className="flex items-center gap-3 border-t border-white/5 bg-white/[0.02] px-4 py-2.5">
+        <div
+          className={`flex items-center gap-3 border-t border-white/5 bg-white/[0.02] px-4 py-2.5 transition-all duration-300 ${
+            isFullscreen && !showControls
+              ? "opacity-0 translate-y-2 pointer-events-none"
+              : "opacity-100 translate-y-0"
+          }`}
+        >
           <button
             onClick={togglePlay}
             className="shrink-0 text-white/60 transition-colors hover:text-white"
@@ -270,6 +404,93 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
           <span className="shrink-0 text-xs tabular-nums text-white/40">
             {formatTime(duration)}
           </span>
+
+          {/* Playback speed selector */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowSpeedMenu(!showSpeedMenu)}
+              className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[11px] font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white border border-white/10"
+              aria-label="Playback speed"
+            >
+              <span>{playbackRate === 1 ? "1.0" : playbackRate}x</span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`transition-transform duration-200 ${showSpeedMenu ? "rotate-180" : ""}`}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+
+            {showSpeedMenu && (
+              <>
+                {/* Backdrop click blocker to close the menu */}
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowSpeedMenu(false)}
+                />
+                <div className="absolute bottom-full right-0 mb-2 w-20 rounded-lg border border-white/10 bg-zinc-950/95 backdrop-blur-md p-1 shadow-xl z-20 flex flex-col gap-0.5">
+                  {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((rate) => (
+                    <button
+                      key={rate}
+                      onClick={() => {
+                        setPlaybackRate(rate);
+                        setShowSpeedMenu(false);
+                      }}
+                      className={`w-full text-left rounded-md px-2 py-1 text-xs transition-colors ${
+                        playbackRate === rate
+                          ? "bg-violet-600 text-white"
+                          : "text-white/70 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      {rate.toFixed(2).replace(/\.00$/, "")}x
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Fullscreen Button */}
+          <button
+            onClick={toggleFullscreen}
+            className="shrink-0 text-white/60 transition-colors hover:text-white p-1 rounded-lg hover:bg-white/5"
+            aria-label={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+          >
+            {isFullscreen ? (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7" />
+              </svg>
+            ) : (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
     );
