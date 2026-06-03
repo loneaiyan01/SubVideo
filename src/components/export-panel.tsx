@@ -1,7 +1,6 @@
-"use client";
-
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   SubtitleCue,
   SubtitleStyle,
@@ -74,6 +73,10 @@ export function ExportPanel({
     fileSize: null,
   });
 
+  const [autoDownload, setAutoDownload] = useState(false);
+  const [etr, setEtr] = useState<string | null>(null);
+  const phaseStartTimeRef = useRef<number>(0);
+
   const canExport =
     videoFile && subtitles.length > 0 && exportState.status !== "processing" && exportState.status !== "muxing";
 
@@ -116,9 +119,11 @@ export function ExportPanel({
 
       // Phase 2: Processing
       setExportState((s) => ({ ...s, status: "processing" }));
+      phaseStartTimeRef.current = Date.now();
+      setEtr(null);
 
       toast.info("Processing video...", {
-        description: "Burning subtitles — the video will play at full speed.",
+        description: "Burning subtitles — processing at high speed.",
       });
 
       const blob = await exportWithCanvas(
@@ -128,6 +133,17 @@ export function ExportPanel({
         exportSettings,
         (progress) => {
           setExportState((s) => ({ ...s, progress }));
+          const elapsed = (Date.now() - phaseStartTimeRef.current) / 1000;
+          if (progress > 2 && elapsed > 1) {
+            const rate = progress / elapsed;
+            const remaining = 100 - progress;
+            const remainingSecs = Math.round(remaining / rate);
+            if (remainingSecs > 0) {
+              setEtr(`~${remainingSecs}s remaining`);
+            } else {
+              setEtr("Finishing...");
+            }
+          }
         },
         (msg) => {
           console.log("[CanvasExporter]", msg);
@@ -136,6 +152,8 @@ export function ExportPanel({
 
       // Phase 3: MP4 muxing
       setExportState((s) => ({ ...s, status: "muxing", progress: 0 }));
+      phaseStartTimeRef.current = Date.now();
+      setEtr(null);
 
       toast.info("Converting to MP4...", {
         description: "Remuxing video container — almost done.",
@@ -156,11 +174,23 @@ export function ExportPanel({
       }
       const finalBlob = await convertToMP4(blob, (progress) => {
         setExportState((s) => ({ ...s, progress }));
+        const elapsed = (Date.now() - phaseStartTimeRef.current) / 1000;
+        if (progress > 2 && elapsed > 1) {
+          const rate = progress / elapsed;
+          const remaining = 100 - progress;
+          const remainingSecs = Math.round(remaining / rate);
+          if (remainingSecs > 0) {
+            setEtr(`~${remainingSecs}s remaining`);
+          } else {
+            setEtr("Finishing...");
+          }
+        }
       });
       const fileExtension = "mp4";
 
       // Create download URL
       const url = URL.createObjectURL(finalBlob);
+      setEtr(null);
 
       setExportState({
         status: "done",
@@ -173,6 +203,15 @@ export function ExportPanel({
       toast.success("Video exported successfully!", {
         description: `Output: ${formatSize(finalBlob.size)} (${fileExtension.toUpperCase()})`,
       });
+
+      if (autoDownload) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `subvideo_output_${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "An unknown error occurred";
@@ -183,9 +222,10 @@ export function ExportPanel({
         error: message,
         fileSize: null,
       });
+      setEtr(null);
       toast.error("Export failed", { description: message });
     }
-  }, [videoFile, subtitles, style, exportSettings]);
+  }, [videoFile, subtitles, style, exportSettings, exportState.downloadUrl, autoDownload]);
 
   const handleDownload = useCallback(() => {
     if (exportState.downloadUrl) {
@@ -243,14 +283,11 @@ export function ExportPanel({
           <div className="space-y-1.5">
             <label className="text-[10px] font-medium text-white/40 uppercase tracking-wider">Aspect Ratio</label>
             <SegmentedControl<AspectRatioOption>
-              options={["16:9"]}
-              value="16:9"
-              onChange={() => {}}
-              labels={{ "16:9": "16:9 (Exclusive)", "original": "", "9:16": "", "1:1": "" }}
+              options={["original", "16:9", "9:16", "1:1"]}
+              value={exportSettings.aspectRatio}
+              onChange={(v) => onExportSettingsChange({ ...exportSettings, aspectRatio: v })}
+              labels={{ original: "Original", "16:9": "16:9", "9:16": "9:16", "1:1": "1:1" }}
             />
-            <p className="text-[9px] text-white/20">
-              Standard widescreen format (All exports restricted to 16:9)
-            </p>
           </div>
 
           {/* Format */}
@@ -261,9 +298,18 @@ export function ExportPanel({
                 MP4 (H.264/AAC)
               </div>
             </div>
-            <p className="text-[9px] text-white/20">
-              Universal format — plays on all devices
-            </p>
+          </div>
+
+          {/* Auto-Download Toggle */}
+          <div className="flex items-center justify-between border-t border-white/5 pt-3 select-none">
+            <div>
+              <label className="text-xs font-semibold text-white/70">Auto-Download</label>
+              <p className="text-[9px] text-white/30">Trigger file download automatically when ready</p>
+            </div>
+            <Switch
+              checked={autoDownload}
+              onCheckedChange={setAutoDownload}
+            />
           </div>
         </div>
       )}
@@ -298,103 +344,78 @@ export function ExportPanel({
         </Button>
       )}
 
-      {/* ── Loading state ──────────────────────────────────────── */}
-      {exportState.status === "loading" && (
-        <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-violet-400 border-t-transparent" />
-            <div>
-              <p className="text-sm font-medium text-white/80">Preparing export engine...</p>
-              <p className="text-xs text-white/40">Setting up canvas renderer</p>
-            </div>
-          </div>
-        </div>
+      {/* ── Processing Visual Stepper ──────────────────────────── */}
+      {!isIdle && exportState.status !== "done" && (
+        <ExportStepper status={exportState.status} progress={exportState.progress} etr={etr} />
       )}
 
-      {/* ── Processing state ───────────────────────────────────── */}
-      {exportState.status === "processing" && (
-        <div className="space-y-3 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-white/80">Rendering...</p>
-            <span className="rounded-md bg-violet-500/20 px-2 py-0.5 text-xs font-semibold tabular-nums text-violet-300">
-              {exportState.progress}%
-            </span>
-          </div>
-          <div className="relative h-2 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-300 ease-out"
-              style={{ width: `${exportState.progress}%` }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-          </div>
-          <p className="text-[11px] text-white/30">Burning subtitles onto video frames...</p>
-        </div>
-      )}
-
-      {/* ── Muxing state ───────────────────────────────────────── */}
-      {exportState.status === "muxing" && (
-        <div className="space-y-3 rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/5 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-white/80">Converting to MP4...</p>
-            <span className="rounded-md bg-fuchsia-500/20 px-2 py-0.5 text-xs font-semibold tabular-nums text-fuchsia-300">
-              {exportState.progress}%
-            </span>
-          </div>
-          <div className="relative h-2 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-fuchsia-500 to-pink-500 transition-all duration-300 ease-out"
-              style={{ width: `${exportState.progress}%` }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-          </div>
-          <p className="text-[11px] text-white/30">Remuxing video container to MP4...</p>
-        </div>
-      )}
-
-      {/* ── Done state ─────────────────────────────────────────── */}
+      {/* ── Finished State Metadata Summary Card ───────────────── */}
       {exportState.status === "done" && (
-        <div className="space-y-3">
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-            <div className="flex items-center gap-2 text-emerald-400">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <p className="text-sm font-semibold">Export Complete!</p>
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 space-y-3.5">
+          <div className="flex items-center gap-2.5 text-emerald-400 select-none">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
-            {exportState.fileSize && (
-              <p className="mt-1 text-xs text-white/40">
-                Output: {formatSize(exportState.fileSize)} ({exportSettings.format.toUpperCase()})
+            <p className="text-xs font-bold tracking-wide uppercase">Export Completed!</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2 text-left rounded-lg bg-black/20 p-3 border border-white/5">
+            <div>
+              <span className="text-[9px] text-white/30 uppercase tracking-wider font-semibold">Format</span>
+              <p className="text-xs font-bold text-white/80">MP4 (MPEG-4)</p>
+            </div>
+            <div>
+              <span className="text-[9px] text-white/30 uppercase tracking-wider font-semibold">Resolution</span>
+              <p className="text-xs font-bold text-white/80">
+                {exportSettings.resolution === "original" ? "Original Size" : 
+                 exportSettings.resolution === "1080p" ? "1920 × 1080" : "1280 × 720"}
               </p>
-            )}
+            </div>
+            <div className="mt-1">
+              <span className="text-[9px] text-white/30 uppercase tracking-wider font-semibold">Aspect Ratio</span>
+              <p className="text-xs font-bold text-white/80">
+                {exportSettings.aspectRatio === "original" ? "Original aspect" : exportSettings.aspectRatio}
+              </p>
+            </div>
+            <div className="mt-1">
+              <span className="text-[9px] text-white/30 uppercase tracking-wider font-semibold">File Size</span>
+              <p className="text-xs font-bold text-white/80">
+                {exportState.fileSize ? formatSize(exportState.fileSize) : "N/A"}
+              </p>
+            </div>
           </div>
 
-          <Button
-            onClick={handleDownload}
-            className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold
-              transition-all duration-200 border-0 rounded-xl text-sm"
-            id="download-button"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Download Video
-          </Button>
-
-          <button
-            onClick={handleReset}
-            className="w-full text-center text-xs text-white/30 hover:text-white/50 transition-colors py-1"
-          >
-            Export again with different settings
-          </button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleDownload}
+              className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-xs transition-colors border-0"
+              id="download-button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Video
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleReset}
+              className="h-10 px-3 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border-0 rounded-lg text-xs transition-colors"
+            >
+              Reset
+            </Button>
+          </div>
         </div>
       )}
 
       {/* ── Error state ────────────────────────────────────────── */}
       {exportState.status === "error" && exportState.error && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 flex flex-col gap-3">
           <p className="text-xs text-red-400">{exportState.error}</p>
+          <Button
+            variant="secondary"
+            onClick={handleReset}
+            className="h-8 w-full bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border-0 rounded-lg text-xs transition-colors"
+          >
+            Try Again
+          </Button>
         </div>
       )}
 
@@ -404,6 +425,105 @@ export function ExportPanel({
           Upload both a video and SRT file to enable export
         </p>
       )}
+    </div>
+  );
+}
+
+// ── Segmented Stepper Component ─────────────────────────────────────
+function ExportStepper({ status, progress, etr }: { status: ExportState["status"]; progress: number; etr: string | null }) {
+  const steps = [
+    { name: "setup", label: "Setup" },
+    { name: "render", label: "Render" },
+    { name: "encode", label: "Encode" },
+    { name: "ready", label: "Ready" }
+  ];
+
+  const getStepState = (name: "setup" | "render" | "encode" | "ready") => {
+    const mapping = { idle: 0, loading: 1, processing: 2, muxing: 3, done: 4, error: -1 };
+    const current = mapping[status] ?? 0;
+    const target = { setup: 1, render: 2, encode: 3, ready: 4 }[name];
+    
+    if (current === -1) return "error";
+    if (current >= target) return current === target && status !== "done" ? "active" : "completed";
+    return "pending";
+  };
+
+  return (
+    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 space-y-4">
+      {/* Steps nodes */}
+      <div className="relative flex items-center justify-between">
+        {/* Progress line background */}
+        <div className="absolute left-3 right-3 top-[14px] h-[2px] -translate-y-1/2 bg-white/10 z-0" />
+        {/* Active progress line fill */}
+        <div 
+          className="absolute left-3 top-[14px] h-[2px] -translate-y-1/2 bg-gradient-to-r from-violet-600 to-fuchsia-600 z-0 transition-all duration-300"
+          style={{
+            width: status === "done" ? "calc(100% - 24px)" : 
+                   status === "muxing" ? "75%" : 
+                   status === "processing" ? "50%" : 
+                   status === "loading" ? "25%" : "0%"
+          }}
+        />
+
+        {steps.map((step, idx) => {
+          const state = getStepState(step.name as any);
+          return (
+            <div key={step.name} className="relative z-10 flex flex-col items-center gap-1.5 select-none">
+              <div 
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold border transition-all duration-300
+                  ${state === "completed" ? "bg-emerald-600 border-emerald-500 text-white shadow-sm shadow-emerald-500/20" : ""}
+                  ${state === "active" ? "bg-violet-600 border-violet-500 text-white animate-pulse shadow-sm shadow-violet-500/25" : ""}
+                  ${state === "pending" ? "bg-zinc-950 border-white/10 text-white/30" : ""}
+                  ${state === "error" ? "bg-red-950 border-red-500 text-red-400" : ""}
+                `}
+              >
+                {state === "completed" ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                ) : idx + 1}
+              </div>
+              <span className={`text-[9px] font-semibold tracking-wide uppercase transition-colors duration-300
+                ${state === "completed" ? "text-emerald-400" : ""}
+                ${state === "active" ? "text-violet-400" : ""}
+                ${state === "pending" ? "text-white/20" : ""}
+                ${state === "error" ? "text-red-400" : ""}
+              `}>
+                {step.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Live info and sub-bar */}
+      <div className="border-t border-white/5 pt-3 space-y-2 select-none">
+        <div className="flex items-center justify-between text-[11px] h-4">
+          <span className="text-white/70 font-semibold uppercase tracking-wider text-[10px]">
+            {status === "loading" && "Initializing engine..."}
+            {status === "processing" && "Burning Subtitle Frames..."}
+            {status === "muxing" && "Remuxing Video Container..."}
+            {status === "done" && "Ready to save!"}
+          </span>
+          <div className="flex items-center gap-2">
+            {etr && (status === "processing" || status === "muxing") && (
+              <span className="text-[10px] text-white/30 font-medium font-mono">{etr}</span>
+            )}
+            {(status === "processing" || status === "muxing") && (
+              <span className="font-mono text-violet-400 font-bold bg-violet-500/10 px-1.5 py-0.5 rounded-md">
+                {progress}%
+              </span>
+            )}
+          </div>
+        </div>
+
+        {(status === "processing" || status === "muxing") && (
+          <div className="relative h-1.5 overflow-hidden rounded-full bg-white/5 w-full">
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 transition-all duration-300 ease-out animate-pulse"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
