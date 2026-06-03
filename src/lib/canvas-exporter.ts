@@ -150,6 +150,12 @@ export async function exportWithCanvas(
       try {
         video.currentTime = 0;
         audioVideo.currentTime = 0;
+        // Speed up export — no need to play at real-time since we're
+        // capturing via requestAnimationFrame, not watching in real-time.
+        // The browser will drop frames it can't render, but MediaRecorder
+        // captures whatever the canvas produces at each rAF tick.
+        video.playbackRate = 16;
+        audioVideo.playbackRate = 16;
         await video.play();
         try {
           await audioVideo.play();

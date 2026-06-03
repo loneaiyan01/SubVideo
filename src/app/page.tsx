@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import { Header } from "@/components/header";
 import { UploadZone } from "@/components/upload-zone";
-import { VideoPreview, VideoPreviewHandle } from "@/components/video-preview";
+import { VideoPreview } from "@/components/video-preview";
 import { StyleControls } from "@/components/style-controls";
 import { ExportPanel } from "@/components/export-panel";
 import { BatchPanel } from "@/components/batch-panel";

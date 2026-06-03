@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { SubtitleCue, SubtitleStyle, AspectRatioOption, ASPECT_RATIO_MAP } from "@/types";
 import { getActiveCue } from "@/lib/srt-parser";
 
@@ -13,11 +13,7 @@ interface VideoPreviewProps {
   onDurationChange?: (duration: number) => void;
 }
 
-export interface VideoPreviewHandle {
-  seekTo: (time: number) => void;
-  getCurrentTime: () => number;
-  getDuration: () => number;
-}
+
 
 export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: VideoPreviewProps) {
     const videoRef = useRef<HTMLVideoElement>(null);

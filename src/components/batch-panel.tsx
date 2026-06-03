@@ -37,6 +37,8 @@ export function BatchPanel({
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(false);
+  const itemsRef = useRef<BatchItem[]>([]);
+  itemsRef.current = items;
 
   const canProcess = items.length > 0 && subtitles.length > 0 && !isProcessing;
 
@@ -98,15 +100,20 @@ export function BatchPanel({
 
     const { exportWithCanvas } = await import("@/lib/canvas-exporter");
 
-    for (let i = 0; i < items.length; i++) {
+    // Snapshot item IDs at the start — use ref for latest state within loop
+    const snapshot = [...itemsRef.current];
+
+    for (let i = 0; i < snapshot.length; i++) {
       if (abortRef.current) break;
-      const item = items[i];
+      const item = snapshot[i];
       if (item.status === "done") continue;
 
-      // Mark processing
+      const itemId = item.id;
+
+      // Mark processing (match by ID, not index)
       setItems((prev) =>
-        prev.map((it, idx) =>
-          idx === i ? { ...it, status: "processing" as const, progress: 0, error: null } : it
+        prev.map((it) =>
+          it.id === itemId ? { ...it, status: "processing" as const, progress: 0, error: null } : it
         )
       );
 
@@ -118,28 +125,28 @@ export function BatchPanel({
           { ...exportSettings, aspectRatio: "16:9" },
           (progress) => {
             setItems((prev) =>
-              prev.map((it, idx) => (idx === i ? { ...it, progress } : it))
+              prev.map((it) => (it.id === itemId ? { ...it, progress } : it))
             );
           }
         );
 
         // Convert to MP4 (now the only supported format)
         setItems((prev) =>
-          prev.map((it, idx) =>
-            idx === i ? { ...it, progress: 0 } : it
+          prev.map((it) =>
+            it.id === itemId ? { ...it, progress: 0 } : it
           )
         );
         const { convertToMP4 } = await import("@/lib/ffmpeg-muxer");
         blob = await convertToMP4(blob, (progress) => {
           setItems((prev) =>
-            prev.map((it, idx) => (idx === i ? { ...it, progress } : it))
+            prev.map((it) => (it.id === itemId ? { ...it, progress } : it))
           );
         });
 
         const url = URL.createObjectURL(blob);
         setItems((prev) =>
-          prev.map((it, idx) =>
-            idx === i
+          prev.map((it) =>
+            it.id === itemId
               ? { ...it, status: "done" as const, progress: 100, downloadUrl: url, fileSize: blob.size }
               : it
           )
@@ -147,8 +154,8 @@ export function BatchPanel({
       } catch (error) {
         const msg = error instanceof Error ? error.message : "Unknown error";
         setItems((prev) =>
-          prev.map((it, idx) =>
-            idx === i ? { ...it, status: "error" as const, error: msg } : it
+          prev.map((it) =>
+            it.id === itemId ? { ...it, status: "error" as const, error: msg } : it
           )
         );
       }
@@ -158,7 +165,7 @@ export function BatchPanel({
     if (!abortRef.current) {
       toast.success("Batch export complete!");
     }
-  }, [canProcess, items, subtitles, style, exportSettings]);
+  }, [canProcess, subtitles, style, exportSettings]);
 
   const cancelProcessing = useCallback(() => {
     abortRef.current = true;

@@ -1,5 +1,4 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { toBlobURL } from "@ffmpeg/util";
 
 let ffmpeg: FFmpeg | null = null;
 
@@ -12,11 +11,12 @@ async function loadFFmpeg(): Promise<FFmpeg> {
 
   ffmpeg = new FFmpeg();
 
-  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+  // Self-hosted from public/ffmpeg/ — eliminates CDN supply-chain risk
+  const baseURL = "/ffmpeg";
 
   await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    coreURL: `${baseURL}/ffmpeg-core.js`,
+    wasmURL: `${baseURL}/ffmpeg-core.wasm`,
   });
 
   return ffmpeg;
