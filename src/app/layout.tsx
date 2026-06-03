@@ -3,6 +3,27 @@ import { Poppins } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 
+// Self-hosted subtitle fonts — no Google Fonts API calls at runtime.
+// These provide @font-face declarations so the fonts are available for
+// both the preview overlay and the canvas-based export renderer.
+import "@fontsource/poppins/400.css";
+import "@fontsource/poppins/700.css";
+import "@fontsource/roboto/400.css";
+import "@fontsource/roboto/700.css";
+import "@fontsource/montserrat/400.css";
+import "@fontsource/montserrat/700.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/700.css";
+import "@fontsource/bebas-neue/400.css";
+import "@fontsource/eb-garamond/400.css";
+import "@fontsource/eb-garamond/700.css";
+import "@fontsource/tinos/400.css";
+import "@fontsource/tinos/700.css";
+import "@fontsource/amiri/400.css";
+import "@fontsource/amiri/700.css";
+import "@fontsource/cairo/400.css";
+import "@fontsource/cairo/700.css";
+
 const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],

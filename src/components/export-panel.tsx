@@ -13,6 +13,7 @@ import {
   FormatOption,
 } from "@/types";
 import { toast } from "sonner";
+import { formatSize } from "@/lib/utils";
 
 interface ExportPanelProps {
   videoFile: File | null;
@@ -23,13 +24,7 @@ interface ExportPanelProps {
   disabled?: boolean;
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
+
 
 // ── Segmented button component ─────────────────────────────────────
 function SegmentedControl<T extends string>({
@@ -183,6 +178,8 @@ export function ExportPanel({
     if (exportState.downloadUrl) {
       URL.revokeObjectURL(exportState.downloadUrl);
     }
+    // Release FFmpeg WASM instance to free memory
+    import("@/lib/ffmpeg-muxer").then(({ unloadFFmpeg }) => unloadFFmpeg()).catch(() => {});
     setExportState({
       status: "idle",
       progress: 0,

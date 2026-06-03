@@ -17,6 +17,7 @@ import {
   DEFAULT_EXPORT_SETTINGS,
 } from "@/types";
 import { parseSRT } from "@/lib/srt-parser";
+import { toast } from "sonner";
 
 export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -34,9 +35,21 @@ export default function Home() {
   }, []);
 
   const handleSrtUpload = useCallback(async (file: File) => {
+    // Guard against unreasonably large SRT files (>5MB is suspicious)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("SRT file too large", {
+        description: "Subtitle files should typically be under 1MB.",
+      });
+      return;
+    }
     setSrtFile(file);
     const text = await file.text();
     const parsed = parseSRT(text);
+    if (parsed.length === 0) {
+      toast.warning("No subtitles found", {
+        description: "The file may not be a valid SRT format.",
+      });
+    }
     setSubtitles(parsed);
   }, []);
 

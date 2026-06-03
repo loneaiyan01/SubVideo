@@ -41,19 +41,6 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
       }
     }, [videoFile]);
 
-    // Load Google Font into <head> (deduplicated by font name)
-    useEffect(() => {
-      const fontName = style.fontFamily.replace(/\s+/g, "+");
-      const linkId = `google-font-${fontName}`;
-      if (document.getElementById(linkId)) return;
-
-      const link = document.createElement("link");
-      link.id = linkId;
-      link.rel = "stylesheet";
-      link.href = `https://fonts.googleapis.com/css2?family=${fontName}:wght@400;700&display=swap`;
-      document.head.appendChild(link);
-    }, [style.fontFamily]);
-
     // Synchronize playback rate
     useEffect(() => {
       if (videoRef.current) {
@@ -131,12 +118,14 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
         setShowControls(true);
         return;
       }
+      // Throttle: if a hide-timeout is already scheduled, controls are
+      // already visible — skip the re-render and let the timer run.
+      if (controlsTimeoutRef.current) return;
+
       setShowControls(true);
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
       controlsTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
+        controlsTimeoutRef.current = null;
       }, 2000);
     }, [isFullscreen]);
 

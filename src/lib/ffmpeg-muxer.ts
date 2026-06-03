@@ -112,3 +112,14 @@ export async function convertToMP4(
   const mp4Data = data instanceof Uint8Array ? data : new TextEncoder().encode(data as string);
   return new Blob([mp4Data as unknown as BlobPart], { type: "video/mp4" });
 }
+
+/**
+ * Release the FFmpeg WASM instance to free memory (tens of MB).
+ * Call this after export/download is complete and no more muxing is expected.
+ */
+export function unloadFFmpeg(): void {
+  if (ffmpeg) {
+    ffmpeg.terminate();
+    ffmpeg = null;
+  }
+}

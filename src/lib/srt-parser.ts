@@ -61,16 +61,33 @@ export function parseSRT(content: string): SubtitleCue[] {
 
 /**
  * Find the active subtitle cue for a given time in seconds.
+ * Uses binary search for O(log n) performance — important since this
+ * is called ~60 times/sec during playback and every frame during export.
  */
 export function getActiveCue(
   cues: SubtitleCue[],
   currentTime: number
 ): SubtitleCue | null {
-  for (const cue of cues) {
-    if (currentTime >= cue.startTime && currentTime <= cue.endTime) {
-      return cue;
+  if (cues.length === 0) return null;
+
+  // Binary search for the last cue whose startTime <= currentTime
+  let low = 0;
+  let high = cues.length - 1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (cues[mid].startTime <= currentTime) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
     }
   }
+
+  // Check if the found cue's time range includes currentTime
+  if (high >= 0 && currentTime >= cues[high].startTime && currentTime <= cues[high].endTime) {
+    return cues[high];
+  }
+
   return null;
 }
 

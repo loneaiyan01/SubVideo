@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { SubtitleCue, SubtitleStyle, ExportSettings, BatchItem } from "@/types";
 import { toast } from "sonner";
+import { formatSize } from "@/lib/utils";
 
 interface BatchPanelProps {
   subtitles: SubtitleCue[];
@@ -12,13 +13,7 @@ interface BatchPanelProps {
   disabled?: boolean;
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
+
 
 const VIDEO_TYPES = [
   "video/mp4",
