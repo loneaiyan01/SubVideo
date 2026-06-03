@@ -1,6 +1,21 @@
 import { SubtitleCue, SubtitleStyle, ExportSettings, RESOLUTION_MAP, ASPECT_RATIO_MAP } from "@/types";
 import { getActiveCue } from "@/lib/srt-parser";
 
+// ── Export constants ──────────────────────────────────────────────────
+const EXPORT_FPS = 30;
+const EXPORT_BITRATE = 5_000_000;
+const RECORDER_TIMESLICE_MS = 100;
+const EXPORT_PLAYBACK_RATE = 16;
+
+// ── Subtitle rendering constants ─────────────────────────────────────
+const SUBTITLE_LINE_HEIGHT = 1.35;
+const SUBTITLE_BG_RADIUS = 6;
+const SUBTITLE_STROKE_RATIO = 0.08;
+const SUBTITLE_MIN_STROKE_WIDTH = 2;
+const SUBTITLE_SHADOW_OFFSET = 2;
+const SUBTITLE_SHADOW_COLOR = "rgba(0,0,0,0.8)";
+const SUBTITLE_STROKE_COLOR = "rgba(0,0,0,0.6)";
+
 /**
  * Canvas-based subtitle burner with resolution/aspect ratio support.
  */
@@ -17,7 +32,6 @@ export async function exportWithCanvas(
     video.muted = true;
     video.playsInline = true;
     video.preload = "auto";
-    video.crossOrigin = "anonymous";
 
     const videoUrl = URL.createObjectURL(videoFile);
     video.src = videoUrl;
@@ -46,7 +60,13 @@ export async function exportWithCanvas(
       const canvas = document.createElement("canvas");
       canvas.width = canvasW;
       canvas.height = canvasH;
-      const ctx = canvas.getContext("2d")!;
+      const maybeCtx = canvas.getContext("2d");
+      if (!maybeCtx) {
+        URL.revokeObjectURL(videoUrl);
+        reject(new Error("Could not create 2D canvas context. Your browser may be running low on GPU resources."));
+        return;
+      }
+      const ctx: CanvasRenderingContext2D = maybeCtx;
 
       // ── Audio capture ──────────────────────────────────────────
       const audioVideo = document.createElement("video");
@@ -54,7 +74,6 @@ export async function exportWithCanvas(
       audioVideo.playsInline = true;
       audioVideo.preload = "auto";
       audioVideo.muted = false;
-      audioVideo.crossOrigin = "anonymous";
 
       let audioStream: MediaStream | null = null;
       let audioCtx: AudioContext | null = null;
@@ -70,7 +89,7 @@ export async function exportWithCanvas(
       }
 
       // ── MediaRecorder setup ────────────────────────────────────
-      const canvasStream = canvas.captureStream(30);
+      const canvasStream = canvas.captureStream(EXPORT_FPS);
 
       if (audioStream) {
         for (const track of audioStream.getAudioTracks()) {
@@ -91,7 +110,7 @@ export async function exportWithCanvas(
       const chunks: Blob[] = [];
       const recorder = new MediaRecorder(canvasStream, {
         mimeType,
-        videoBitsPerSecond: 5_000_000,
+        videoBitsPerSecond: EXPORT_BITRATE,
       });
 
       recorder.ondataavailable = (e) => {
@@ -145,7 +164,7 @@ export async function exportWithCanvas(
         audioVideo.pause();
       });
 
-      recorder.start(100);
+      recorder.start(RECORDER_TIMESLICE_MS);
 
       try {
         video.currentTime = 0;
@@ -154,8 +173,8 @@ export async function exportWithCanvas(
         // capturing via requestAnimationFrame, not watching in real-time.
         // The browser will drop frames it can't render, but MediaRecorder
         // captures whatever the canvas produces at each rAF tick.
-        video.playbackRate = 16;
-        audioVideo.playbackRate = 16;
+        video.playbackRate = EXPORT_PLAYBACK_RATE;
+        audioVideo.playbackRate = EXPORT_PLAYBACK_RATE;
         await video.play();
         try {
           await audioVideo.play();
@@ -260,7 +279,7 @@ function drawSubtitle(
   const maxTextWidth = (style.maxWidth / 100) * canvasW;
   const lines = wrapText(ctx, text, maxTextWidth);
 
-  const lineHeight = fontSize * 1.35;
+  const lineHeight = fontSize * SUBTITLE_LINE_HEIGHT;
   const blockHeight = lines.length * lineHeight;
 
   const x = canvasW / 2;
@@ -280,19 +299,19 @@ function drawSubtitle(
     const bgColorWithAlpha = style.bgColor + alpha.toString(16).padStart(2, "0");
 
     ctx.fillStyle = bgColorWithAlpha;
-    roundRect(ctx, x - widest / 2 - padX, y - padY, widest + padX * 2, blockHeight + padY * 2, 6);
+    roundRect(ctx, x - widest / 2 - padX, y - padY, widest + padX * 2, blockHeight + padY * 2, SUBTITLE_BG_RADIUS);
   }
 
   for (let i = 0; i < lines.length; i++) {
     const ly = y + i * lineHeight;
 
     if (!style.bgEnabled) {
-      ctx.fillStyle = "rgba(0,0,0,0.8)";
-      ctx.fillText(lines[i], x + 2, ly + 2, maxTextWidth);
+      ctx.fillStyle = SUBTITLE_SHADOW_COLOR;
+      ctx.fillText(lines[i], x + SUBTITLE_SHADOW_OFFSET, ly + SUBTITLE_SHADOW_OFFSET, maxTextWidth);
     }
 
-    ctx.strokeStyle = "rgba(0,0,0,0.6)";
-    ctx.lineWidth = Math.max(2, fontSize * 0.08);
+    ctx.strokeStyle = SUBTITLE_STROKE_COLOR;
+    ctx.lineWidth = Math.max(SUBTITLE_MIN_STROKE_WIDTH, fontSize * SUBTITLE_STROKE_RATIO);
     ctx.lineJoin = "round";
     ctx.strokeText(lines[i], x, ly, maxTextWidth);
 

@@ -282,7 +282,6 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
             onEnded={() => setIsPlaying(false)}
             className="h-full w-full object-contain"
             playsInline
-            crossOrigin="anonymous"
           />
 
           {/* ── Aspect ratio crop overlay ───────────────────────── */}
@@ -377,7 +376,8 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
               }}
             />
             {/* Subtitle markers */}
-            {subtitles.map((cue) => (
+            {/* Only render subtitle markers for manageable cue counts to avoid DOM thrash */}
+            {subtitles.length <= 200 && subtitles.map((cue) => (
               <div
                 key={cue.index}
                 className="absolute top-full mt-0.5 h-0.5 rounded-full bg-violet-400/40"
@@ -403,7 +403,7 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
               className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[11px] font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white border border-white/10"
               aria-label="Playback speed"
             >
-              <span>{playbackRate === 1 ? "1.0" : playbackRate}x</span>
+              <span>{playbackRate.toFixed(1)}x</span>
               <svg
                 width="12"
                 height="12"
