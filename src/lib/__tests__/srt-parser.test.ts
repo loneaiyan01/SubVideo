@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseSRT, getActiveCue } from "../srt-parser";
+import { parseSRT, getActiveCue, formatSrtTimestamp } from "../srt-parser";
 import { SubtitleCue } from "@/types";
 
 // ── parseSRT ──────────────────────────────────────────────────────────
@@ -110,5 +110,24 @@ describe("getActiveCue", () => {
   it("returns the last cue when time is within it", () => {
     const result = getActiveCue(cues, 11.0);
     expect(result?.text).toBe("Third");
+  });
+});
+
+// ── formatSrtTimestamp ──────────────────────────────────────────────────
+
+describe("formatSrtTimestamp", () => {
+  it("formats 0 seconds correctly", () => {
+    expect(formatSrtTimestamp(0)).toBe("00:00:00,000");
+  });
+
+  it("formats sub-second durations correctly", () => {
+    expect(formatSrtTimestamp(0.5)).toBe("00:00:00,500");
+    expect(formatSrtTimestamp(0.005)).toBe("00:00:00,005");
+  });
+
+  it("formats seconds, minutes, and hours correctly", () => {
+    expect(formatSrtTimestamp(5.25)).toBe("00:00:05,250");
+    expect(formatSrtTimestamp(90.123)).toBe("00:01:30,123");
+    expect(formatSrtTimestamp(3661.999)).toBe("01:01:01,999");
   });
 });

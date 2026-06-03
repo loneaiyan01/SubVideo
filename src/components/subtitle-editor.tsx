@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
-import { serializeSRT } from "@/lib/srt-parser";
+import { serializeSRT, formatSrtTimestamp } from "@/lib/srt-parser";
 import { toast } from "sonner";
 
 interface SubtitleEditorProps {
@@ -311,27 +311,58 @@ export function SubtitleEditor({
                   </span>
                 </div>
                 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteSubtitle?.(cue.index);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                  aria-label="Delete Subtitle"
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const startTimeStr = formatSrtTimestamp(cue.startTime);
+                      const endTimeStr = formatSrtTimestamp(cue.endTime);
+                      const textToCopy = `${startTimeStr} --> ${endTimeStr}\n${cue.text}`;
+                      navigator.clipboard.writeText(textToCopy);
+                      toast.success(`Copied subtitle #${cue.index} with timing`);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-white/20 hover:text-violet-400 hover:bg-violet-500/10 transition-all"
+                    aria-label="Copy Subtitle with Timing"
+                    title="Copy with Timing"
                   >
-                    <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                  </svg>
-                </button>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSubtitle?.(cue.index);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                    aria-label="Delete Subtitle"
+                    title="Delete Subtitle"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               <Textarea
                 className="resize-none min-h-[50px] text-sm bg-transparent border-0 p-0 focus-visible:ring-0 focus-visible:outline-hidden text-white/80 placeholder:text-white/20"
@@ -389,7 +420,7 @@ export function SubtitleEditor({
 
         {filteredSubtitles.length === 0 && searchQuery && (
           <div className="text-center py-10 text-white/30 text-xs">
-            <p>No matching subtitles found for "{searchQuery}"</p>
+            <p>No matching subtitles found for &quot;{searchQuery}&quot;</p>
           </div>
         )}
 
