@@ -84,7 +84,11 @@ function DropZone({
           </div>
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-white/90">
-              {isPasted ? "Pasted Text Subtitles" : file.name}
+              {isPasted 
+                ? "Pasted Text Subtitles" 
+                : label === "video file" 
+                  ? "Video Uploaded" 
+                  : file.name}
             </p>
             <p className="text-[10px] text-white/40">
               {isPasted ? "Successfully parsed text" : formatSize(file.size)}
