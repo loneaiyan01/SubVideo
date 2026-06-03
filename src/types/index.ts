@@ -30,6 +30,13 @@ export const AVAILABLE_FONTS = [
   "Cairo"
 ];
 
+export const ACCEPTED_VIDEO_TYPES: readonly string[] = [
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-matroska",
+];
+
 export interface ExportState {
   status: "idle" | "loading" | "processing" | "muxing" | "done" | "error";
   progress: number;       // 0-100

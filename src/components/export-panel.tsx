@@ -100,7 +100,19 @@ export function ExportPanel({
       });
 
       // Dynamically import the canvas exporter
-      const { exportWithCanvas } = await import("@/lib/canvas-exporter");
+      let exportWithCanvas;
+      try {
+        ({ exportWithCanvas } = await import("@/lib/canvas-exporter"));
+      } catch {
+        setExportState({
+          status: "error",
+          progress: 0,
+          downloadUrl: null,
+          error: "Failed to load export engine. Please refresh and try again.",
+          fileSize: null,
+        });
+        return;
+      }
 
       // Phase 2: Processing
       setExportState((s) => ({ ...s, status: "processing" }));
@@ -129,7 +141,19 @@ export function ExportPanel({
         description: "Remuxing video container — almost done.",
       });
 
-      const { convertToMP4 } = await import("@/lib/ffmpeg-muxer");
+      let convertToMP4;
+      try {
+        ({ convertToMP4 } = await import("@/lib/ffmpeg-muxer"));
+      } catch {
+        setExportState({
+          status: "error",
+          progress: 0,
+          downloadUrl: null,
+          error: "Failed to load MP4 converter. Please refresh and try again.",
+          fileSize: null,
+        });
+        return;
+      }
       const finalBlob = await convertToMP4(blob, (progress) => {
         setExportState((s) => ({ ...s, progress }));
       });

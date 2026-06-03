@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { SubtitleCue, SubtitleStyle, ExportSettings, BatchItem } from "@/types";
+import { SubtitleCue, SubtitleStyle, ExportSettings, BatchItem, ACCEPTED_VIDEO_TYPES } from "@/types";
 import { toast } from "sonner";
 import { formatSize } from "@/lib/utils";
 
@@ -15,12 +15,7 @@ interface BatchPanelProps {
 
 
 
-const VIDEO_TYPES = [
-  "video/mp4",
-  "video/webm",
-  "video/quicktime",
-  "video/x-matroska",
-];
+
 
 export function BatchPanel({
   subtitles,
@@ -41,7 +36,7 @@ export function BatchPanel({
   const handleFiles = useCallback((files: FileList) => {
     const newItems: BatchItem[] = [];
     for (const file of Array.from(files)) {
-      if (!VIDEO_TYPES.includes(file.type)) continue;
+      if (!ACCEPTED_VIDEO_TYPES.includes(file.type)) continue;
       newItems.push({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         videoFile: file,
@@ -93,7 +88,14 @@ export function BatchPanel({
     setIsProcessing(true);
     abortRef.current = false;
 
-    const { exportWithCanvas } = await import("@/lib/canvas-exporter");
+    let exportWithCanvas;
+    try {
+      ({ exportWithCanvas } = await import("@/lib/canvas-exporter"));
+    } catch {
+      toast.error("Failed to load export engine. Please refresh and try again.");
+      setIsProcessing(false);
+      return;
+    }
 
     // Snapshot item IDs at the start — use ref for latest state within loop
     const snapshot = [...itemsRef.current];

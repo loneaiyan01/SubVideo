@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useReducer, useCallback } from "react";
 import { Header } from "@/components/header";
 import { UploadZone } from "@/components/upload-zone";
 import { VideoPreview } from "@/components/video-preview";
@@ -8,6 +8,7 @@ import { StyleControls } from "@/components/style-controls";
 import { ExportPanel } from "@/components/export-panel";
 import { BatchPanel } from "@/components/batch-panel";
 import { SubtitleEditor } from "@/components/subtitle-editor";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   SubtitleCue,
@@ -19,19 +20,67 @@ import {
 import { parseSRT } from "@/lib/srt-parser";
 import { toast } from "sonner";
 
+// ── State management ──────────────────────────────────────────────
+interface AppState {
+  videoFile: File | null;
+  srtFile: File | null;
+  subtitles: SubtitleCue[];
+  style: SubtitleStyle;
+  exportSettings: ExportSettings;
+  isProcessing: boolean;
+  isSidebarOpen: boolean;
+}
+
+type AppAction =
+  | { type: "SET_VIDEO"; file: File | null }
+  | { type: "SET_SRT"; file: File | null; subtitles: SubtitleCue[] }
+  | { type: "SET_SUBTITLES"; subtitles: SubtitleCue[] }
+  | { type: "SET_STYLE"; style: SubtitleStyle }
+  | { type: "SET_EXPORT_SETTINGS"; settings: ExportSettings }
+  | { type: "SET_PROCESSING"; value: boolean }
+  | { type: "TOGGLE_SIDEBAR" }
+  | { type: "CLEAR_SRT" };
+
+const initialState: AppState = {
+  videoFile: null,
+  srtFile: null,
+  subtitles: [],
+  style: DEFAULT_STYLE,
+  exportSettings: DEFAULT_EXPORT_SETTINGS,
+  isProcessing: false,
+  isSidebarOpen: true,
+};
+
+function appReducer(state: AppState, action: AppAction): AppState {
+  switch (action.type) {
+    case "SET_VIDEO":
+      return { ...state, videoFile: action.file };
+    case "SET_SRT":
+      return { ...state, srtFile: action.file, subtitles: action.subtitles };
+    case "SET_SUBTITLES":
+      return { ...state, subtitles: action.subtitles };
+    case "SET_STYLE":
+      return { ...state, style: action.style };
+    case "SET_EXPORT_SETTINGS":
+      return { ...state, exportSettings: action.settings };
+    case "SET_PROCESSING":
+      return { ...state, isProcessing: action.value };
+    case "TOGGLE_SIDEBAR":
+      return { ...state, isSidebarOpen: !state.isSidebarOpen };
+    case "CLEAR_SRT":
+      return { ...state, srtFile: null, subtitles: [] };
+    default:
+      return state;
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────
 export default function Home() {
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [srtFile, setSrtFile] = useState<File | null>(null);
-  const [subtitles, setSubtitles] = useState<SubtitleCue[]>([]);
-  const [style, setStyle] = useState<SubtitleStyle>(DEFAULT_STYLE);
-  const [exportSettings, setExportSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
-
+  const [state, dispatch] = useReducer(appReducer, initialState);
+  const { videoFile, srtFile, subtitles, style, exportSettings, isProcessing, isSidebarOpen } = state;
 
   const handleVideoUpload = useCallback((file: File) => {
-    setVideoFile(file);
+    dispatch({ type: "SET_VIDEO", file });
   }, []);
 
   const handleSrtUpload = useCallback(async (file: File) => {
@@ -42,7 +91,6 @@ export default function Home() {
       });
       return;
     }
-    setSrtFile(file);
     const text = await file.text();
     const parsed = parseSRT(text);
     if (parsed.length === 0) {
@@ -50,16 +98,15 @@ export default function Home() {
         description: "The file may not be a valid SRT format.",
       });
     }
-    setSubtitles(parsed);
+    dispatch({ type: "SET_SRT", file, subtitles: parsed });
   }, []);
 
   const handleVideoRemove = useCallback(() => {
-    setVideoFile(null);
+    dispatch({ type: "SET_VIDEO", file: null });
   }, []);
 
   const handleSrtRemove = useCallback(() => {
-    setSrtFile(null);
-    setSubtitles([]);
+    dispatch({ type: "CLEAR_SRT" });
   }, []);
 
   const hasFiles = videoFile !== null || srtFile !== null;
@@ -95,12 +142,14 @@ export default function Home() {
               {/* Video Preview - takes 70% on desktop */}
               <div className="flex-1 lg:flex-[7]">
                 <div className="sticky top-6">
-                  <VideoPreview
-                    videoFile={videoFile}
-                    subtitles={subtitles}
-                    style={style}
-                    aspectRatio={exportSettings.aspectRatio}
-                  />
+                  <ErrorBoundary>
+                    <VideoPreview
+                      videoFile={videoFile}
+                      subtitles={subtitles}
+                      style={style}
+                      aspectRatio={exportSettings.aspectRatio}
+                    />
+                  </ErrorBoundary>
                   {subtitles.length > 0 && (
                     <div className="mt-3 flex items-center justify-between text-xs text-white/30">
                       <div className="flex items-center gap-2">
@@ -121,7 +170,7 @@ export default function Home() {
                         {subtitles.length} subtitles loaded
                       </div>
                       <button
-                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                        onClick={() => dispatch({ type: "TOGGLE_SIDEBAR" })}
                         className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
                       >
                         {isSidebarOpen ? (
@@ -156,11 +205,13 @@ export default function Home() {
                       </TabsList>
 
                       <TabsContent value="subtitles" className="mt-0">
-                        <SubtitleEditor
-                          subtitles={subtitles}
-                          onUpdateSubtitles={setSubtitles}
-                          disabled={isProcessing}
-                        />
+                        <ErrorBoundary>
+                          <SubtitleEditor
+                            subtitles={subtitles}
+                            onUpdateSubtitles={(subs) => dispatch({ type: "SET_SUBTITLES", subtitles: subs })}
+                            disabled={isProcessing}
+                          />
+                        </ErrorBoundary>
                       </TabsContent>
 
                       <TabsContent value="editor" className="mt-0">
@@ -178,31 +229,37 @@ export default function Home() {
                           </TabsList>
 
                           <TabsContent value="styles" className="mt-0">
-                            <StyleControls
-                              style={style}
-                              onStyleChange={setStyle}
-                              disabled={isProcessing}
-                            />
+                            <ErrorBoundary>
+                              <StyleControls
+                                style={style}
+                                onStyleChange={(s) => dispatch({ type: "SET_STYLE", style: s })}
+                                disabled={isProcessing}
+                              />
+                            </ErrorBoundary>
                           </TabsContent>
 
                           <TabsContent value="export" className="mt-0">
-                            <ExportPanel
-                              videoFile={videoFile}
-                              subtitles={subtitles}
-                              style={style}
-                              exportSettings={exportSettings}
-                              onExportSettingsChange={setExportSettings}
-                              disabled={isProcessing}
-                            />
+                            <ErrorBoundary>
+                              <ExportPanel
+                                videoFile={videoFile}
+                                subtitles={subtitles}
+                                style={style}
+                                exportSettings={exportSettings}
+                                onExportSettingsChange={(s) => dispatch({ type: "SET_EXPORT_SETTINGS", settings: s })}
+                                disabled={isProcessing}
+                              />
+                            </ErrorBoundary>
                           </TabsContent>
 
                           <TabsContent value="batch" className="mt-0">
-                            <BatchPanel
-                              subtitles={subtitles}
-                              style={style}
-                              exportSettings={exportSettings}
-                              disabled={isProcessing}
-                            />
+                            <ErrorBoundary>
+                              <BatchPanel
+                                subtitles={subtitles}
+                                style={style}
+                                exportSettings={exportSettings}
+                                disabled={isProcessing}
+                              />
+                            </ErrorBoundary>
                           </TabsContent>
                         </Tabs>
                       </TabsContent>

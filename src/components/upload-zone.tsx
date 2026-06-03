@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { formatSize } from "@/lib/utils";
+import { ACCEPTED_VIDEO_TYPES } from "@/types";
 
 interface UploadZoneProps {
   videoFile: File | null;
@@ -17,12 +18,6 @@ interface UploadZoneProps {
   disabled?: boolean;
 }
 
-const VIDEO_TYPES = [
-  "video/mp4",
-  "video/webm",
-  "video/quicktime",
-  "video/x-matroska",
-];
 const SRT_EXTENSION = ".srt";
 
 
@@ -75,8 +70,8 @@ function DropZone({
   if (file) {
     return (
       <div className="group relative flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-2 sm:p-3 transition-all duration-300 hover:border-white/20 hover:bg-white/[0.05]">
-        <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-400">
-          {React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: "w-4 h-4 sm:w-5 sm:h-5" })}
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-400 [&>svg]:w-4 [&>svg]:h-4 sm:[&>svg]:w-5 sm:[&>svg]:h-5">
+          {icon}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] sm:text-xs font-medium text-white/90">
@@ -181,7 +176,7 @@ export function UploadZone({
 
   const handleVideoFile = useCallback(
     (file: File) => {
-      if (!VIDEO_TYPES.includes(file.type)) {
+      if (!ACCEPTED_VIDEO_TYPES.includes(file.type)) {
         toast.error("Invalid video format", {
           description: "Please upload MP4, WebM, MOV, or MKV files.",
         });
