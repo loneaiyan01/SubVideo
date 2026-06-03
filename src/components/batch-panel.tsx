@@ -174,15 +174,14 @@ export function BatchPanel({
 
   const downloadItem = useCallback((item: BatchItem) => {
     if (!item.downloadUrl) return;
-    const ext = exportSettings.format === "mp4" ? "mp4" : "webm";
     const baseName = item.videoFile.name.replace(/\.[^.]+$/, "");
     const a = document.createElement("a");
     a.href = item.downloadUrl;
-    a.download = `${baseName}_subtitled.${ext}`;
+    a.download = `${baseName}_subtitled.mp4`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-  }, [exportSettings.format]);
+  }, []);
 
   const doneCount = items.filter((i) => i.status === "done").length;
   const errorCount = items.filter((i) => i.status === "error").length;

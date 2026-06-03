@@ -20,8 +20,6 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
     const containerRef = useRef<HTMLDivElement>(null);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Format font name for Google Fonts API
-    const googleFontName = style.fontFamily.replace(/\s+/g, "+");
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [activeCue, setActiveCue] = useState<SubtitleCue | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -42,6 +40,19 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
         setVideoUrl(null);
       }
     }, [videoFile]);
+
+    // Load Google Font into <head> (deduplicated by font name)
+    useEffect(() => {
+      const fontName = style.fontFamily.replace(/\s+/g, "+");
+      const linkId = `google-font-${fontName}`;
+      if (document.getElementById(linkId)) return;
+
+      const link = document.createElement("link");
+      link.id = linkId;
+      link.rel = "stylesheet";
+      link.href = `https://fonts.googleapis.com/css2?family=${fontName}:wght@400;700&display=swap`;
+      document.head.appendChild(link);
+    }, [style.fontFamily]);
 
     // Synchronize playback rate
     useEffect(() => {
@@ -263,11 +274,6 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
             : "h-full"
         } ${isFullscreen && !showControls ? "cursor-none" : ""}`}
       >
-        {/* Inject dynamic Google Font */}
-        <link
-          href={`https://fonts.googleapis.com/css2?family=${googleFontName}:wght@400;700&display=swap`}
-          rel="stylesheet"
-        />
         {/* Video container */}
         <div
           style={{ containerType: "size" }}

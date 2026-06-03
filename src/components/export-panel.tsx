@@ -85,6 +85,11 @@ export function ExportPanel({
   const handleExport = useCallback(async () => {
     if (!videoFile || subtitles.length === 0) return;
 
+    // Revoke previous export URL to prevent blob memory leak on re-export
+    if (exportState.downloadUrl) {
+      URL.revokeObjectURL(exportState.downloadUrl);
+    }
+
     try {
       // Phase 1: Loading
       setExportState({
@@ -172,7 +177,7 @@ export function ExportPanel({
       a.click();
       document.body.removeChild(a);
     }
-  }, [exportState.downloadUrl, exportSettings.format]);
+  }, [exportState.downloadUrl]);
 
   const handleReset = useCallback(() => {
     if (exportState.downloadUrl) {

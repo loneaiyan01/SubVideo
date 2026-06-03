@@ -43,8 +43,9 @@ export function SubtitleEditor({
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
-    const secs = (seconds % 60).toFixed(1);
-    return `${mins}:${secs.padStart(4, "0")}s`;
+    const secs = Math.floor(seconds % 60);
+    const tenths = Math.floor((seconds % 1) * 10);
+    return `${mins}:${String(secs).padStart(2, "0")}.${tenths}s`;
   };
 
   const handleExportSRT = () => {
