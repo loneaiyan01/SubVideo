@@ -90,6 +90,37 @@ export default function Home() {
     videoPreviewRef.current?.seekTo(time);
   }, []);
 
+  const handleAddSubtitle = useCallback(() => {
+    const time = videoPreviewRef.current?.getCurrentTime() ?? 0;
+    
+    const newCue: SubtitleCue = {
+      index: subtitles.length + 1,
+      startTime: time,
+      endTime: time + 2.0,
+      text: "New subtitle...",
+    };
+    
+    const updated = [...subtitles, newCue].sort((a, b) => a.startTime - b.startTime);
+    const reindexed = updated.map((cue, idx) => ({
+      ...cue,
+      index: idx + 1,
+    }));
+    
+    dispatch({ type: "SET_SUBTITLES", subtitles: reindexed });
+    toast.success("Added new subtitle block at playhead");
+  }, [subtitles]);
+
+  const handleDeleteSubtitle = useCallback((cueIndex: number) => {
+    const updated = subtitles.filter(cue => cue.index !== cueIndex);
+    const reindexed = updated.map((cue, idx) => ({
+      ...cue,
+      index: idx + 1,
+    }));
+    
+    dispatch({ type: "SET_SUBTITLES", subtitles: reindexed });
+    toast.success("Deleted subtitle block");
+  }, [subtitles]);
+
   const handleVideoUpload = useCallback((file: File) => {
     dispatch({ type: "SET_VIDEO", file });
   }, []);
@@ -208,12 +239,18 @@ export default function Home() {
                 <aside className="w-full shrink-0 lg:w-[350px]">
                   <div className="sticky top-6 space-y-6 rounded-2xl border border-white/5 bg-white/[0.02] p-5 backdrop-blur-sm">
                     <Tabs defaultValue="subtitles" className="w-full">
-                      <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/5 p-1 rounded-lg">
+                      <TabsList className="grid w-full grid-cols-4 mb-6 bg-white/5 p-1 rounded-lg">
                         <TabsTrigger value="subtitles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
                           Subtitles
                         </TabsTrigger>
-                        <TabsTrigger value="editor" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                          Editor Tools
+                        <TabsTrigger value="styles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                          Styling
+                        </TabsTrigger>
+                        <TabsTrigger value="export" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                          Export
+                        </TabsTrigger>
+                        <TabsTrigger value="batch" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                          Batch
                         </TabsTrigger>
                       </TabsList>
 
@@ -223,60 +260,46 @@ export default function Home() {
                             subtitles={subtitles}
                             activeCueIndex={activeCueIndex}
                             onSelectCueTime={handleSelectCueTime}
+                            onAddSubtitle={handleAddSubtitle}
+                            onDeleteSubtitle={handleDeleteSubtitle}
                             onUpdateSubtitles={(subs) => dispatch({ type: "SET_SUBTITLES", subtitles: subs })}
                             disabled={isProcessing}
                           />
                         </ErrorBoundary>
                       </TabsContent>
 
-                      <TabsContent value="editor" className="mt-0">
-                        <Tabs defaultValue="styles" className="w-full">
-                          <TabsList className="grid w-full grid-cols-3 mb-6 bg-white/5 p-1 rounded-lg">
-                            <TabsTrigger value="styles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                              Styling
-                            </TabsTrigger>
-                            <TabsTrigger value="export" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                              Export
-                            </TabsTrigger>
-                            <TabsTrigger value="batch" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                              Batch
-                            </TabsTrigger>
-                          </TabsList>
+                      <TabsContent value="styles" className="mt-0">
+                        <ErrorBoundary>
+                          <StyleControls
+                            style={style}
+                            onStyleChange={(s) => dispatch({ type: "SET_STYLE", style: s })}
+                            disabled={isProcessing}
+                          />
+                        </ErrorBoundary>
+                      </TabsContent>
 
-                          <TabsContent value="styles" className="mt-0">
-                            <ErrorBoundary>
-                              <StyleControls
-                                style={style}
-                                onStyleChange={(s) => dispatch({ type: "SET_STYLE", style: s })}
-                                disabled={isProcessing}
-                              />
-                            </ErrorBoundary>
-                          </TabsContent>
+                      <TabsContent value="export" className="mt-0">
+                        <ErrorBoundary>
+                          <ExportPanel
+                            videoFile={videoFile}
+                            subtitles={subtitles}
+                            style={style}
+                            exportSettings={exportSettings}
+                            onExportSettingsChange={(s) => dispatch({ type: "SET_EXPORT_SETTINGS", settings: s })}
+                            disabled={isProcessing}
+                          />
+                        </ErrorBoundary>
+                      </TabsContent>
 
-                          <TabsContent value="export" className="mt-0">
-                            <ErrorBoundary>
-                              <ExportPanel
-                                videoFile={videoFile}
-                                subtitles={subtitles}
-                                style={style}
-                                exportSettings={exportSettings}
-                                onExportSettingsChange={(s) => dispatch({ type: "SET_EXPORT_SETTINGS", settings: s })}
-                                disabled={isProcessing}
-                              />
-                            </ErrorBoundary>
-                          </TabsContent>
-
-                          <TabsContent value="batch" className="mt-0">
-                            <ErrorBoundary>
-                              <BatchPanel
-                                subtitles={subtitles}
-                                style={style}
-                                exportSettings={exportSettings}
-                                disabled={isProcessing}
-                              />
-                            </ErrorBoundary>
-                          </TabsContent>
-                        </Tabs>
+                      <TabsContent value="batch" className="mt-0">
+                        <ErrorBoundary>
+                          <BatchPanel
+                            subtitles={subtitles}
+                            style={style}
+                            exportSettings={exportSettings}
+                            disabled={isProcessing}
+                          />
+                        </ErrorBoundary>
                       </TabsContent>
                     </Tabs>
                   </div>

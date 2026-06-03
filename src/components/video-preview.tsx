@@ -6,6 +6,7 @@ import { getActiveCue } from "@/lib/srt-parser";
 
 export interface VideoPreviewHandle {
   seekTo: (time: number) => void;
+  getCurrentTime: () => number;
 }
 
 interface VideoPreviewProps {
@@ -41,6 +42,9 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
             onActiveCueChange?.(currentIdx);
           }
         }
+      },
+      getCurrentTime: () => {
+        return videoRef.current?.currentTime ?? 0;
       },
     }));
 
