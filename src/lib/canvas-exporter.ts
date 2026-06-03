@@ -3,9 +3,8 @@ import { getActiveCue } from "@/lib/srt-parser";
 
 // ── Export constants ──────────────────────────────────────────────────
 const EXPORT_FPS = 30;
-const EXPORT_BITRATE = 5_000_000;
 const RECORDER_TIMESLICE_MS = 100;
-const EXPORT_PLAYBACK_RATE = 16;
+const EXPORT_PLAYBACK_RATE = 1;
 
 // ── Subtitle rendering constants ─────────────────────────────────────
 const SUBTITLE_LINE_HEIGHT = 1.35;
@@ -67,6 +66,8 @@ export async function exportWithCanvas(
         return;
       }
       const ctx: CanvasRenderingContext2D = maybeCtx;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
 
       // ── Audio capture ──────────────────────────────────────────
       const audioVideo = document.createElement("video");
@@ -107,10 +108,16 @@ export async function exportWithCanvas(
 
       onLog?.(`Recording: ${mimeType}`);
 
+      // Scale bitrate dynamically based on output resolution (area)
+      const area = canvasW * canvasH;
+      const dynamicBitrate = area >= 1920 * 1080 ? 10_000_000 : // 10 Mbps for 1080p+
+                             area >= 1280 * 720  ? 6_000_000  : // 6 Mbps for 720p
+                             4_000_000;                         // 4 Mbps for smaller resolutions
+
       const chunks: Blob[] = [];
       const recorder = new MediaRecorder(canvasStream, {
         mimeType,
-        videoBitsPerSecond: EXPORT_BITRATE,
+        videoBitsPerSecond: dynamicBitrate,
       });
 
       recorder.ondataavailable = (e) => {
