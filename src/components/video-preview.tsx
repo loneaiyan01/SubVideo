@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import { SubtitleCue, SubtitleStyle, AspectRatioOption, ASPECT_RATIO_MAP } from "@/types";
 import { getActiveCue } from "@/lib/srt-parser";
+
+export interface VideoPreviewHandle {
+  seekTo: (time: number) => void;
+}
 
 interface VideoPreviewProps {
   videoFile: File | null;
@@ -11,14 +15,34 @@ interface VideoPreviewProps {
   aspectRatio: AspectRatioOption;
   onTimeUpdate?: (time: number) => void;
   onDurationChange?: (duration: number) => void;
+  onActiveCueChange?: (index: number | null) => void;
 }
 
 
 
-export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: VideoPreviewProps) {
+export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
+  function VideoPreview({ videoFile, subtitles, style, aspectRatio, onActiveCueChange }: VideoPreviewProps, ref) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastActiveCueIndexRef = useRef<number | null>(null);
+
+    useImperativeHandle(ref, () => ({
+      seekTo: (time: number) => {
+        if (videoRef.current) {
+          videoRef.current.currentTime = time;
+          setCurrentTime(time);
+          const active = getActiveCue(subtitles, time);
+          setActiveCue(active);
+          
+          const currentIdx = active ? active.index : null;
+          if (currentIdx !== lastActiveCueIndexRef.current) {
+            lastActiveCueIndexRef.current = currentIdx;
+            onActiveCueChange?.(currentIdx);
+          }
+        }
+      },
+    }));
 
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [activeCue, setActiveCue] = useState<SubtitleCue | null>(null);
@@ -64,9 +88,16 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
       if (videoRef.current) {
         const time = videoRef.current.currentTime;
         setCurrentTime(time);
-        setActiveCue(getActiveCue(subtitles, time));
+        const cue = getActiveCue(subtitles, time);
+        setActiveCue(cue);
+        
+        const currentIdx = cue ? cue.index : null;
+        if (currentIdx !== lastActiveCueIndexRef.current) {
+          lastActiveCueIndexRef.current = currentIdx;
+          onActiveCueChange?.(currentIdx);
+        }
       }
-    }, [subtitles]);
+    }, [subtitles, onActiveCueChange]);
 
     const handleLoadedMetadata = useCallback(() => {
       if (videoRef.current) {
@@ -486,6 +517,7 @@ export function VideoPreview({ videoFile, subtitles, style, aspectRatio }: Video
       </div>
     );
   }
+);
 
 
 // ── Crop overlay component ───────────────────────────────────────────

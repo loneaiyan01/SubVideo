@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { SubtitleCue } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,16 +10,48 @@ import { serializeSRT } from "@/lib/srt-parser";
 
 interface SubtitleEditorProps {
   subtitles: SubtitleCue[];
+  activeCueIndex: number | null;
+  onSelectCueTime?: (time: number) => void;
   onUpdateSubtitles: (subtitles: SubtitleCue[]) => void;
   disabled?: boolean;
 }
 
 export function SubtitleEditor({
   subtitles,
+  activeCueIndex,
+  onSelectCueTime,
   onUpdateSubtitles,
   disabled,
 }: SubtitleEditorProps) {
   const [shiftMs, setShiftMs] = useState<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (activeCueIndex !== null && containerRef.current) {
+      const activeCard = containerRef.current.querySelector(
+        `[data-cue-index="${activeCueIndex}"]`
+      );
+      if (activeCard) {
+        activeCard.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+      }
+    }
+  }, [activeCueIndex]);
+
+  const handleCardClick = (e: React.MouseEvent, startTime: number) => {
+    const target = e.target as HTMLElement;
+    if (
+      target.closest("textarea") ||
+      target.closest("input") ||
+      target.closest(".relative.h-1.5") || // Slider tracks
+      target.closest("span[role='slider']") // Slider handles
+    ) {
+      return;
+    }
+    onSelectCueTime?.(startTime);
+  };
 
   const handleTextChange = (index: number, newText: string) => {
     const newSubs = subtitles.map((cue) =>
@@ -110,12 +142,22 @@ export function SubtitleEditor({
       </div>
 
       {/* Subtitles List */}
-      <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 min-h-[400px] max-h-[60vh]">
+      <div ref={containerRef} className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 min-h-[400px] max-h-[60vh]">
         {subtitles.map((cue, index) => {
           const prevEndTime = index > 0 ? subtitles[index - 1].endTime : 0;
           const nextStartTime = index < subtitles.length - 1 ? subtitles[index + 1].startTime : cue.endTime + 5;
+          const isActive = cue.index === activeCueIndex;
           return (
-            <div key={cue.index} className="relative rounded-lg border border-white/5 bg-white/[0.01] p-3 hover:bg-white/[0.03] transition-colors">
+            <div 
+              key={cue.index} 
+              data-cue-index={cue.index}
+              onClick={(e) => handleCardClick(e, cue.startTime)}
+              className={`relative rounded-lg border p-3 hover:bg-white/[0.03] transition-all duration-300 cursor-pointer ${
+                isActive 
+                  ? "border-violet-500 bg-violet-500/5 shadow-[0_0_12px_rgba(139,92,246,0.15)] ring-1 ring-violet-500/30" 
+                  : "border-white/5 bg-white/[0.01]"
+              }`}
+            >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-violet-400 bg-violet-400/10 px-1.5 py-0.5 rounded-sm">
                   #{cue.index}

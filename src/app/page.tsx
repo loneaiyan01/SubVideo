@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useReducer, useCallback } from "react";
+import React, { useReducer, useCallback, useRef, useState } from "react";
 import { Header } from "@/components/header";
 import { UploadZone } from "@/components/upload-zone";
-import { VideoPreview } from "@/components/video-preview";
+import { VideoPreview, VideoPreviewHandle } from "@/components/video-preview";
 import { StyleControls } from "@/components/style-controls";
 import { ExportPanel } from "@/components/export-panel";
 import { BatchPanel } from "@/components/batch-panel";
@@ -79,6 +79,17 @@ export default function Home() {
   const [state, dispatch] = useReducer(appReducer, initialState);
   const { videoFile, srtFile, subtitles, style, exportSettings, isProcessing, isSidebarOpen } = state;
 
+  const [activeCueIndex, setActiveCueIndex] = useState<number | null>(null);
+  const videoPreviewRef = useRef<VideoPreviewHandle>(null);
+
+  const handleActiveCueChange = useCallback((index: number | null) => {
+    setActiveCueIndex(index);
+  }, []);
+
+  const handleSelectCueTime = useCallback((time: number) => {
+    videoPreviewRef.current?.seekTo(time);
+  }, []);
+
   const handleVideoUpload = useCallback((file: File) => {
     dispatch({ type: "SET_VIDEO", file });
   }, []);
@@ -144,10 +155,12 @@ export default function Home() {
                 <div className="sticky top-6">
                   <ErrorBoundary>
                     <VideoPreview
+                      ref={videoPreviewRef}
                       videoFile={videoFile}
                       subtitles={subtitles}
                       style={style}
                       aspectRatio={exportSettings.aspectRatio}
+                      onActiveCueChange={handleActiveCueChange}
                     />
                   </ErrorBoundary>
                   {subtitles.length > 0 && (
@@ -208,6 +221,8 @@ export default function Home() {
                         <ErrorBoundary>
                           <SubtitleEditor
                             subtitles={subtitles}
+                            activeCueIndex={activeCueIndex}
+                            onSelectCueTime={handleSelectCueTime}
                             onUpdateSubtitles={(subs) => dispatch({ type: "SET_SUBTITLES", subtitles: subs })}
                             disabled={isProcessing}
                           />
