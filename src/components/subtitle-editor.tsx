@@ -31,6 +31,8 @@ export function SubtitleEditor({
   const [shiftMs, setShiftMs] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [replaceQuery, setReplaceQuery] = useState("");
+  const [showReplacePanel, setShowReplacePanel] = useState(false);
+  const [showSyncPanel, setShowSyncPanel] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const filteredSubtitles = subtitles.filter((cue) =>
@@ -128,97 +130,117 @@ export function SubtitleEditor({
   };
 
   return (
-    <div className={`flex flex-col h-full gap-5 ${disabled ? "pointer-events-none opacity-50" : ""}`}>
-      {/* Utilities */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Time Shift Utility */}
-        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 flex flex-col">
-          <h3 className="text-sm font-semibold text-white/90 mb-2">Sync Fixer</h3>
-          <p className="text-xs text-white/40 mb-3 flex-1">
-            Shift all subtitle timestamps forward or backward simultaneously.
-          </p>
-          <div className="flex gap-2 mt-auto">
-            <Input 
-              type="number" 
-              placeholder="e.g. 500 or -1000" 
-              value={shiftMs || ""} 
-              onChange={(e) => setShiftMs(Number(e.target.value))}
-              className="h-9 bg-black/20 text-white border-white/10 text-xs"
-            />
-            <Button 
-              variant="secondary" 
-              className="h-9 w-24 shrink-0 text-xs bg-white/10 hover:bg-white/20 text-white border-0"
-              onClick={applySyncShift}
+    <div className={`flex flex-col h-full gap-4 ${disabled ? "pointer-events-none opacity-50" : ""}`}>
+      {/* Sleek Toolbar */}
+      <div className="flex gap-2 items-center shrink-0">
+        <div className="relative flex-1">
+          <Input
+            placeholder="Search subtitles..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-9 bg-white/5 text-white border-white/10 text-xs pl-8 pr-7 focus-visible:ring-violet-500 rounded-lg"
+          />
+          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 flex items-center justify-center text-white/40 hover:text-white/70 text-[9px] rounded-full hover:bg-white/5 transition-colors"
             >
-              Shift (ms)
-            </Button>
-          </div>
+              ✕
+            </button>
+          )}
         </div>
 
-        {/* Export Subtitles Utility */}
-        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 flex flex-col">
-          <h3 className="text-sm font-semibold text-white/90 mb-2">Export Subtitles</h3>
-          <p className="text-xs text-white/40 mb-3 flex-1">
-            Download the modified subtitles directly as an SRT file.
-          </p>
-          <Button 
-            variant="secondary" 
-            className="h-9 w-full text-xs bg-white/10 hover:bg-white/20 text-white border-0 mt-auto flex gap-2 items-center justify-center transition-colors"
-            onClick={handleExportSRT}
-            disabled={subtitles.length === 0}
-            title="Download SRT"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-            Download .SRT
-          </Button>
-        </div>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setShowReplacePanel(!showReplacePanel);
+            setShowSyncPanel(false);
+          }}
+          className={`h-9 w-9 shrink-0 p-0 border-0 flex items-center justify-center rounded-lg transition-colors ${
+            showReplacePanel ? "bg-violet-600 text-white" : "bg-white/5 text-white/70 hover:bg-white/10"
+          }`}
+          title="Search & Replace"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="10" rx="2" />
+            <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+          </svg>
+        </Button>
+
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setShowSyncPanel(!showSyncPanel);
+            setShowReplacePanel(false);
+          }}
+          className={`h-9 w-9 shrink-0 p-0 border-0 flex items-center justify-center rounded-lg transition-colors ${
+            showSyncPanel ? "bg-violet-600 text-white" : "bg-white/5 text-white/70 hover:bg-white/10"
+          }`}
+          title="Sync Fixer (Time Shift)"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        </Button>
+
+        <Button
+          variant="secondary"
+          onClick={handleExportSRT}
+          disabled={subtitles.length === 0}
+          className="h-9 w-9 shrink-0 p-0 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border-0 flex items-center justify-center rounded-lg transition-colors"
+          title="Download SRT"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </Button>
       </div>
 
-      {/* Search & Replace Utility */}
-      {subtitles.length > 0 && (
-        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white/90">Search & Replace</h3>
-            {searchQuery && (
-              <span className="text-[10px] text-violet-400 font-medium font-mono">
-                {filteredSubtitles.length} matches
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div className="relative">
-              <Input
-                placeholder="Search word..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 bg-black/20 text-white border-white/10 text-xs pr-7 focus-visible:ring-violet-500"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center text-white/40 hover:text-white/70 text-[9px] rounded-full hover:bg-white/5 transition-colors"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Replace..."
-                value={replaceQuery}
-                onChange={(e) => setReplaceQuery(e.target.value)}
-                className="h-8 bg-black/20 text-white border-white/10 text-xs focus-visible:ring-violet-500"
-              />
-              <Button
-                variant="secondary"
-                className="h-8 px-2 shrink-0 text-xs bg-violet-600 hover:bg-violet-500 text-white border-0 transition-colors"
-                onClick={handleReplaceAll}
-                disabled={!searchQuery}
-              >
-                Replace
-              </Button>
-            </div>
-          </div>
+      {/* Slide-down Replace Drawer */}
+      {showReplacePanel && subtitles.length > 0 && (
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 flex gap-2 items-center animate-in fade-in slide-in-from-top-1 duration-200 shrink-0">
+          <Input
+            placeholder="Replace text with..."
+            value={replaceQuery}
+            onChange={(e) => setReplaceQuery(e.target.value)}
+            className="h-8 flex-1 bg-black/20 text-white border-white/10 text-xs focus-visible:ring-violet-500 rounded-md"
+          />
+          <Button
+            variant="secondary"
+            className="h-8 px-3 text-xs bg-violet-600 hover:bg-violet-500 text-white border-0 transition-colors rounded-md font-semibold"
+            onClick={handleReplaceAll}
+            disabled={!searchQuery}
+          >
+            Replace All
+          </Button>
+        </div>
+      )}
+
+      {/* Slide-down Sync Drawer */}
+      {showSyncPanel && subtitles.length > 0 && (
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 flex gap-2 items-center justify-between animate-in fade-in slide-in-from-top-1 duration-200 shrink-0">
+          <span className="text-[10px] text-white/40 shrink-0 font-medium">Shift Cues:</span>
+          <Input 
+            type="number" 
+            placeholder="ms, e.g. 500 or -1000" 
+            value={shiftMs || ""} 
+            onChange={(e) => setShiftMs(Number(e.target.value))}
+            className="h-8 flex-1 max-w-[140px] bg-black/20 text-white border-white/10 text-xs text-center focus-visible:ring-violet-500 rounded-md"
+          />
+          <Button 
+            variant="secondary" 
+            className="h-8 px-3 shrink-0 text-xs bg-white/10 hover:bg-white/20 text-white border-0 rounded-md transition-colors"
+            onClick={applySyncShift}
+          >
+            Apply Shift
+          </Button>
         </div>
       )}
 

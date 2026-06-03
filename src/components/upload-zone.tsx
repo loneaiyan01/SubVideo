@@ -31,6 +31,7 @@ function DropZone({
   onRemove,
   disabled,
   sublabel,
+  isCompact,
 }: {
   label: string;
   accept: string;
@@ -40,6 +41,7 @@ function DropZone({
   onRemove: () => void;
   disabled?: boolean;
   sublabel: string;
+  isCompact?: boolean;
 }) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,16 +70,26 @@ function DropZone({
   );
 
   if (file) {
+    const isPasted = file.name === "pasted_subtitles.srt";
     return (
-      <div className="group relative flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-2 sm:p-3 transition-all duration-300 hover:border-white/20 hover:bg-white/[0.05]">
-        <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-400 [&>svg]:w-4 [&>svg]:h-4 sm:[&>svg]:w-5 sm:[&>svg]:h-5">
-          {icon}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[11px] sm:text-xs font-medium text-white/90">
-            {file.name}
-          </p>
-          <p className="text-[10px] text-white/40">{formatSize(file.size)}</p>
+      <div className="group relative flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 h-full w-full transition-all duration-300 hover:border-white/20 hover:bg-white/[0.05]">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-400 [&>svg]:w-5 [&>svg]:h-5">
+            {isPasted ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"/>
+                <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/>
+              </svg>
+            ) : icon}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold text-white/90">
+              {isPasted ? "Pasted Text Subtitles" : file.name}
+            </p>
+            <p className="text-[10px] text-white/40">
+              {isPasted ? "Successfully parsed text" : formatSize(file.size)}
+            </p>
+          </div>
         </div>
         <button
           onClick={onRemove}
@@ -113,8 +125,8 @@ function DropZone({
       onDrop={handleDrop}
       onClick={() => !disabled && inputRef.current?.click()}
       className={`
-        group relative cursor-pointer rounded-2xl border-2 border-dashed p-6
-        transition-all duration-300
+        group relative cursor-pointer rounded-2xl border-2 border-dashed flex flex-col justify-center items-center h-full w-full
+        transition-all duration-300 p-3
         ${
           dragOver
             ? "border-violet-400 bg-violet-500/10 shadow-[0_0_30px_rgba(139,92,246,0.15)]"
@@ -131,10 +143,11 @@ function DropZone({
         className="hidden"
         disabled={disabled}
       />
-      <div className="flex flex-col items-center gap-3 text-center">
+      <div className="flex flex-col items-center gap-2 text-center">
         <div
           className={`
-          flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300
+          flex items-center justify-center rounded-xl transition-all duration-300
+          ${isCompact ? "h-8 w-8 [&>svg]:w-4 [&>svg]:h-4" : "h-12 w-12 [&>svg]:w-6 [&>svg]:h-6"}
           ${
             dragOver
               ? "bg-violet-500/30 text-violet-300 scale-110"
@@ -145,10 +158,10 @@ function DropZone({
           {icon}
         </div>
         <div>
-          <p className="text-sm font-medium text-white/70">
+          <p className="text-xs font-semibold text-white/70">
             Drop {label} here
           </p>
-          <p className="mt-1 text-xs text-white/30">{sublabel}</p>
+          {!isCompact && <p className="mt-0.5 text-[10px] text-white/30">{sublabel}</p>}
         </div>
       </div>
     </div>
@@ -242,8 +255,8 @@ export function UploadZone({
   );
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2" id="upload-zone">
-      <div className="h-full">
+    <div className="grid gap-4 sm:grid-cols-2 items-stretch" id="upload-zone">
+      <div className="h-[160px] flex flex-col justify-stretch">
         <DropZone
           label="video file"
           accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
@@ -256,7 +269,7 @@ export function UploadZone({
         />
       </div>
 
-      <div className="h-full">
+      <div className="h-[160px] flex flex-col justify-stretch">
         {srtFile ? (
           <DropZone
             label="SRT file"
@@ -270,11 +283,11 @@ export function UploadZone({
           />
         ) : (
           <Tabs defaultValue="paste" className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 mb-2 bg-white/5 p-1 rounded-lg">
+            <TabsList className="grid w-full grid-cols-2 mb-2 bg-white/5 p-1 rounded-lg shrink-0 h-9">
               <TabsTrigger value="upload" className="rounded-md text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white">Upload .SRT File</TabsTrigger>
               <TabsTrigger value="paste" className="rounded-md text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white">Paste Raw Text</TabsTrigger>
             </TabsList>
-            <TabsContent value="upload" className="mt-0 flex-1">
+            <TabsContent value="upload" className="mt-0 flex-1 h-0">
               <DropZone
                 label="SRT file"
                 accept=".srt"
@@ -284,12 +297,13 @@ export function UploadZone({
                 onRemove={onSrtRemove}
                 disabled={disabled}
                 sublabel=".srt subtitle file"
+                isCompact
               />
             </TabsContent>
-            <TabsContent value="paste" className="mt-0 h-[196px] sm:h-[166px]">
-              <div className="flex flex-col gap-2 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] p-3 h-full">
+            <TabsContent value="paste" className="mt-0 flex-1 h-0 flex flex-col justify-stretch">
+              <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-2 h-full justify-between">
                 <Textarea 
-                  className="flex-1 resize-none bg-black/40 border-white/10 text-[11px] p-2 leading-relaxed text-white/70 font-mono custom-scrollbar"
+                  className="flex-1 resize-none bg-transparent border-0 text-[11px] p-1.5 leading-relaxed text-white/70 font-mono custom-scrollbar focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-hidden"
                   placeholder={"1\n00:00:00,000 --> 00:00:02,000\nPaste your subtitle text here..."}
                   value={pastedSrt}
                   onChange={(e) => setPastedSrt(e.target.value)}
@@ -298,7 +312,7 @@ export function UploadZone({
                 <Button 
                   onClick={handlePasteSubmit} 
                   disabled={disabled || !pastedSrt.trim()}
-                  className="w-full text-xs h-8 bg-violet-600 hover:bg-violet-500 text-white border-0 transition-colors shrink-0"
+                  className="w-full text-xs h-7 bg-violet-600 hover:bg-violet-500 text-white border-0 transition-colors shrink-0 rounded-md"
                 >
                   Parse Subtitles
                 </Button>
