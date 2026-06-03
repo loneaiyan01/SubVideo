@@ -183,7 +183,7 @@ export default function Home() {
             <section className={`flex flex-1 flex-col gap-4 sm:gap-6 ${isSidebarOpen ? 'lg:flex-row' : 'lg:flex-col'}`}>
               {/* Video Preview - takes 70% on desktop */}
               <div className="flex-1 lg:flex-[7]">
-                <div className="sticky top-6">
+                <div className="lg:sticky lg:top-6">
                   <ErrorBoundary>
                     <VideoPreview
                       ref={videoPreviewRef}
@@ -237,19 +237,19 @@ export default function Home() {
               {/* Sidebar - Subtitles & Editor Tools */}
               {isSidebarOpen && (
                 <aside className="w-full shrink-0 lg:w-[350px]">
-                  <div className="sticky top-6 space-y-6 rounded-2xl border border-white/5 bg-white/[0.02] p-5 backdrop-blur-sm">
+                  <div className="lg:sticky lg:top-6 space-y-6 rounded-2xl border border-white/5 bg-white/[0.02] p-3.5 sm:p-5 backdrop-blur-sm">
                     <Tabs defaultValue="subtitles" className="w-full">
-                      <TabsList className="grid w-full grid-cols-4 mb-6 bg-white/5 p-1 rounded-lg">
-                        <TabsTrigger value="subtitles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                      <TabsList className="grid w-full grid-cols-4 mb-4 sm:mb-6 bg-white/5 p-1 rounded-lg">
+                        <TabsTrigger value="subtitles" className="rounded-md text-[10px] sm:text-[11px] px-1 sm:px-2 data-[state=active]:bg-violet-600 data-[state=active]:text-white">
                           Subtitles
                         </TabsTrigger>
-                        <TabsTrigger value="styles" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                        <TabsTrigger value="styles" className="rounded-md text-[10px] sm:text-[11px] px-1 sm:px-2 data-[state=active]:bg-violet-600 data-[state=active]:text-white">
                           Styling
                         </TabsTrigger>
-                        <TabsTrigger value="export" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                        <TabsTrigger value="export" className="rounded-md text-[10px] sm:text-[11px] px-1 sm:px-2 data-[state=active]:bg-violet-600 data-[state=active]:text-white">
                           Export
                         </TabsTrigger>
-                        <TabsTrigger value="batch" className="rounded-md text-[11px] data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+                        <TabsTrigger value="batch" className="rounded-md text-[10px] sm:text-[11px] px-1 sm:px-2 data-[state=active]:bg-violet-600 data-[state=active]:text-white">
                           Batch
                         </TabsTrigger>
                       </TabsList>
@@ -313,7 +313,7 @@ export default function Home() {
 
         {/* ── Empty state ────────────────────────────────────────── */}
         {!hasFiles && (
-          <div className="flex flex-1 items-center justify-center py-20">
+          <div className="flex flex-1 items-center justify-center py-10 sm:py-20">
             <div className="text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border border-violet-500/10">
                 <svg

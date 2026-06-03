@@ -372,7 +372,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
 
         {/* Controls bar */}
         <div
-          className={`flex items-center gap-3 border-t border-white/5 bg-white/[0.02] px-4 py-2.5 transition-all duration-300 ${
+          className={`flex items-center gap-1.5 sm:gap-3 border-t border-white/5 bg-white/[0.02] px-2 py-2 sm:px-4 sm:py-2.5 transition-all duration-300 ${
             isFullscreen && !showControls
               ? "opacity-0 translate-y-2 pointer-events-none"
               : "opacity-100 translate-y-0"
@@ -395,7 +395,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
             )}
           </button>
 
-          <span className="shrink-0 text-xs tabular-nums text-white/40">
+          <span className="shrink-0 text-[10px] sm:text-xs tabular-nums text-white/40">
             {formatTime(currentTime)}
           </span>
 
@@ -427,7 +427,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
             ))}
           </div>
 
-          <span className="shrink-0 text-xs tabular-nums text-white/40">
+          <span className="shrink-0 text-[10px] sm:text-xs tabular-nums text-white/40">
             {formatTime(duration)}
           </span>
 
@@ -435,7 +435,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
           <div className="relative shrink-0">
             <button
               onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-              className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[11px] font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white border border-white/10"
+              className="flex items-center gap-0.5 sm:gap-1 rounded-lg bg-white/5 px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-[11px] font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white border border-white/10"
               aria-label="Playback speed"
             >
               <span>{playbackRate.toFixed(1)}x</span>

@@ -245,7 +245,7 @@ export function SubtitleEditor({
       )}
 
       {/* Subtitles List */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 min-h-[400px] max-h-[60vh]">
+      <div ref={containerRef} className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 min-h-[300px] max-h-[400px] lg:max-h-[60vh]">
         {filteredSubtitles.map((cue) => {
           const globalIndex = subtitles.findIndex(c => c.index === cue.index);
           const prevEndTime = globalIndex > 0 ? subtitles[globalIndex - 1].endTime : 0;
