@@ -17,6 +17,11 @@ interface SubtitleEditorProps {
   onDeleteSubtitle?: (cueIndex: number) => void;
   onUpdateSubtitles: (subtitles: SubtitleCue[]) => void;
   disabled?: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  onPushHistory: (subsBefore: SubtitleCue[]) => void;
 }
 
 export function SubtitleEditor({
@@ -27,6 +32,11 @@ export function SubtitleEditor({
   onDeleteSubtitle,
   onUpdateSubtitles,
   disabled,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  onPushHistory,
 }: SubtitleEditorProps) {
   const [shiftMs, setShiftMs] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState("");
@@ -34,6 +44,7 @@ export function SubtitleEditor({
   const [showReplacePanel, setShowReplacePanel] = useState(false);
   const [showSyncPanel, setShowSyncPanel] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const initialSubtitlesRef = useRef<SubtitleCue[] | null>(null);
 
   const filteredSubtitles = subtitles.filter((cue) =>
     cue.text.toLowerCase().includes(searchQuery.toLowerCase())
@@ -54,6 +65,7 @@ export function SubtitleEditor({
     });
 
     if (count > 0) {
+      onPushHistory(subtitles);
       onUpdateSubtitles(newSubs);
       toast.success(`Replaced instances in ${count} subtitle blocks`);
     } else {
@@ -105,6 +117,7 @@ export function SubtitleEditor({
       endTime: Math.max(0.1, cue.endTime + shiftSeconds),
     }));
     
+    onPushHistory(subtitles);
     onUpdateSubtitles(newSubs);
   };
 
@@ -185,6 +198,32 @@ export function SubtitleEditor({
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
+          </svg>
+        </Button>
+
+        <Button
+          variant="secondary"
+          onClick={onUndo}
+          disabled={!canUndo}
+          className="h-9 w-9 shrink-0 p-0 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border-0 flex items-center justify-center rounded-lg transition-colors disabled:opacity-30 disabled:pointer-events-none"
+          title="Undo (Ctrl+Z)"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 7v6h6" />
+            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+          </svg>
+        </Button>
+
+        <Button
+          variant="secondary"
+          onClick={onRedo}
+          disabled={!canRedo}
+          className="h-9 w-9 shrink-0 p-0 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border-0 flex items-center justify-center rounded-lg transition-colors disabled:opacity-30 disabled:pointer-events-none"
+          title="Redo (Ctrl+Y)"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 7v6h-6" />
+            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7" />
           </svg>
         </Button>
 
@@ -298,6 +337,18 @@ export function SubtitleEditor({
                 className="resize-none min-h-[50px] text-sm bg-transparent border-0 p-0 focus-visible:ring-0 focus-visible:outline-hidden text-white/80 placeholder:text-white/20"
                 value={cue.text}
                 onChange={(e) => handleTextChange(cue.index, e.target.value)}
+                onFocus={() => {
+                  initialSubtitlesRef.current = subtitles;
+                }}
+                onBlur={() => {
+                  if (initialSubtitlesRef.current) {
+                    const initialCard = initialSubtitlesRef.current.find(c => c.index === cue.index);
+                    if (initialCard && initialCard.text !== cue.text) {
+                      onPushHistory(initialSubtitlesRef.current);
+                    }
+                    initialSubtitlesRef.current = null;
+                  }
+                }}
               />
               <div className="mt-4 px-2 select-none group/slider">
                 <div className="flex justify-between text-[9px] text-white/20 mb-1.5 opacity-0 group-hover/slider:opacity-100 transition-opacity">
@@ -315,6 +366,18 @@ export function SubtitleEditor({
                         c.index === cue.index ? { ...cue, startTime: val[0], endTime: val[1] } : c
                       );
                       onUpdateSubtitles(newSubs);
+                    }
+                  }}
+                  onPointerDown={() => {
+                    initialSubtitlesRef.current = subtitles;
+                  }}
+                  onPointerUp={() => {
+                    if (initialSubtitlesRef.current) {
+                      const initialCard = initialSubtitlesRef.current.find(c => c.index === cue.index);
+                      if (initialCard && (initialCard.startTime !== cue.startTime || initialCard.endTime !== cue.endTime)) {
+                        onPushHistory(initialSubtitlesRef.current);
+                      }
+                      initialSubtitlesRef.current = null;
                     }
                   }}
                   className="w-full"

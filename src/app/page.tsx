@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useReducer, useCallback, useRef, useState } from "react";
+import React, { useReducer, useCallback, useRef, useState, useEffect } from "react";
 import { Header } from "@/components/header";
 import { UploadZone } from "@/components/upload-zone";
 import { VideoPreview, VideoPreviewHandle } from "@/components/video-preview";
@@ -29,6 +29,8 @@ interface AppState {
   exportSettings: ExportSettings;
   isProcessing: boolean;
   isSidebarOpen: boolean;
+  pastSubtitles: SubtitleCue[][];
+  futureSubtitles: SubtitleCue[][];
 }
 
 type AppAction =
@@ -39,7 +41,10 @@ type AppAction =
   | { type: "SET_EXPORT_SETTINGS"; settings: ExportSettings }
   | { type: "SET_PROCESSING"; value: boolean }
   | { type: "TOGGLE_SIDEBAR" }
-  | { type: "CLEAR_SRT" };
+  | { type: "CLEAR_SRT" }
+  | { type: "UNDO_SUBTITLES" }
+  | { type: "REDO_SUBTITLES" }
+  | { type: "PUSH_SUBTITLES_HISTORY"; subtitlesBefore: SubtitleCue[] };
 
 const initialState: AppState = {
   videoFile: null,
@@ -49,6 +54,8 @@ const initialState: AppState = {
   exportSettings: DEFAULT_EXPORT_SETTINGS,
   isProcessing: false,
   isSidebarOpen: true,
+  pastSubtitles: [],
+  futureSubtitles: [],
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -56,7 +63,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case "SET_VIDEO":
       return { ...state, videoFile: action.file };
     case "SET_SRT":
-      return { ...state, srtFile: action.file, subtitles: action.subtitles };
+      return {
+        ...state,
+        srtFile: action.file,
+        subtitles: action.subtitles,
+        pastSubtitles: [],
+        futureSubtitles: [],
+      };
     case "SET_SUBTITLES":
       return { ...state, subtitles: action.subtitles };
     case "SET_STYLE":
@@ -68,7 +81,41 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case "TOGGLE_SIDEBAR":
       return { ...state, isSidebarOpen: !state.isSidebarOpen };
     case "CLEAR_SRT":
-      return { ...state, srtFile: null, subtitles: [] };
+      return {
+        ...state,
+        srtFile: null,
+        subtitles: [],
+        pastSubtitles: [],
+        futureSubtitles: [],
+      };
+    case "PUSH_SUBTITLES_HISTORY":
+      return {
+        ...state,
+        pastSubtitles: [...state.pastSubtitles, action.subtitlesBefore],
+        futureSubtitles: [],
+      };
+    case "UNDO_SUBTITLES": {
+      if (state.pastSubtitles.length === 0) return state;
+      const newPast = [...state.pastSubtitles];
+      const previous = newPast.pop()!;
+      return {
+        ...state,
+        pastSubtitles: newPast,
+        futureSubtitles: [...state.futureSubtitles, state.subtitles],
+        subtitles: previous,
+      };
+    }
+    case "REDO_SUBTITLES": {
+      if (state.futureSubtitles.length === 0) return state;
+      const newFuture = [...state.futureSubtitles];
+      const next = newFuture.pop()!;
+      return {
+        ...state,
+        pastSubtitles: [...state.pastSubtitles, state.subtitles],
+        futureSubtitles: newFuture,
+        subtitles: next,
+      };
+    }
     default:
       return state;
   }
@@ -77,10 +124,93 @@ function appReducer(state: AppState, action: AppAction): AppState {
 // ── Component ─────────────────────────────────────────────────────
 export default function Home() {
   const [state, dispatch] = useReducer(appReducer, initialState);
-  const { videoFile, srtFile, subtitles, style, exportSettings, isProcessing, isSidebarOpen } = state;
+  const { videoFile, srtFile, subtitles, style, exportSettings, isProcessing, isSidebarOpen, pastSubtitles, futureSubtitles } = state;
 
   const [activeCueIndex, setActiveCueIndex] = useState<number | null>(null);
   const videoPreviewRef = useRef<VideoPreviewHandle>(null);
+
+  // Load from localStorage on client-side mount
+  useEffect(() => {
+    const savedSubtitles = localStorage.getItem("subvideo_subtitles");
+    const savedStyle = localStorage.getItem("subvideo_style");
+    const savedExportSettings = localStorage.getItem("subvideo_export_settings");
+
+    if (savedSubtitles) {
+      try {
+        const parsed = JSON.parse(savedSubtitles);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          dispatch({ type: "SET_SUBTITLES", subtitles: parsed });
+        }
+      } catch (e) {
+        console.error("Failed to parse saved subtitles", e);
+      }
+    }
+
+    if (savedStyle) {
+      try {
+        const parsed = JSON.parse(savedStyle);
+        dispatch({ type: "SET_STYLE", style: parsed });
+      } catch (e) {
+        console.error("Failed to parse saved style", e);
+      }
+    }
+
+    if (savedExportSettings) {
+      try {
+        const parsed = JSON.parse(savedExportSettings);
+        dispatch({ type: "SET_EXPORT_SETTINGS", settings: parsed });
+      } catch (e) {
+        console.error("Failed to parse saved export settings", e);
+      }
+    }
+  }, []);
+
+  // Debounced auto-save for subtitles
+  useEffect(() => {
+    if (subtitles.length === 0) {
+      localStorage.removeItem("subvideo_subtitles");
+      return;
+    }
+    const timer = setTimeout(() => {
+      localStorage.setItem("subvideo_subtitles", JSON.stringify(subtitles));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [subtitles]);
+
+  // Auto-save styling
+  useEffect(() => {
+    localStorage.setItem("subvideo_style", JSON.stringify(style));
+  }, [style]);
+
+  // Auto-save export settings
+  useEffect(() => {
+    localStorage.setItem("subvideo_export_settings", JSON.stringify(exportSettings));
+  }, [exportSettings]);
+
+  // Keyboard shortcuts listener for Undo/Redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (isInput) return; // Let native browser undo/redo work when typing inside inputs
+
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        if (e.key.toLowerCase() === "z") {
+          e.preventDefault();
+          if (e.shiftKey) {
+            dispatch({ type: "REDO_SUBTITLES" });
+          } else {
+            dispatch({ type: "UNDO_SUBTITLES" });
+          }
+        } else if (e.key.toLowerCase() === "y") {
+          e.preventDefault();
+          dispatch({ type: "REDO_SUBTITLES" });
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const handleActiveCueChange = useCallback((index: number | null) => {
     setActiveCueIndex(index);
@@ -91,6 +221,7 @@ export default function Home() {
   }, []);
 
   const handleAddSubtitle = useCallback(() => {
+    dispatch({ type: "PUSH_SUBTITLES_HISTORY", subtitlesBefore: subtitles });
     const time = videoPreviewRef.current?.getCurrentTime() ?? 0;
     
     const newCue: SubtitleCue = {
@@ -111,6 +242,7 @@ export default function Home() {
   }, [subtitles]);
 
   const handleDeleteSubtitle = useCallback((cueIndex: number) => {
+    dispatch({ type: "PUSH_SUBTITLES_HISTORY", subtitlesBefore: subtitles });
     const updated = subtitles.filter(cue => cue.index !== cueIndex);
     const reindexed = updated.map((cue, idx) => ({
       ...cue,
@@ -151,7 +283,7 @@ export default function Home() {
     dispatch({ type: "CLEAR_SRT" });
   }, []);
 
-  const hasFiles = videoFile !== null || srtFile !== null;
+  const hasFiles = videoFile !== null || subtitles.length > 0;
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -264,6 +396,11 @@ export default function Home() {
                             onDeleteSubtitle={handleDeleteSubtitle}
                             onUpdateSubtitles={(subs) => dispatch({ type: "SET_SUBTITLES", subtitles: subs })}
                             disabled={isProcessing}
+                            canUndo={pastSubtitles.length > 0}
+                            canRedo={futureSubtitles.length > 0}
+                            onUndo={() => dispatch({ type: "UNDO_SUBTITLES" })}
+                            onRedo={() => dispatch({ type: "REDO_SUBTITLES" })}
+                            onPushHistory={(subsBefore) => dispatch({ type: "PUSH_SUBTITLES_HISTORY", subtitlesBefore: subsBefore })}
                           />
                         </ErrorBoundary>
                       </TabsContent>
