@@ -5,8 +5,7 @@ import { Header } from "@/components/header";
 import { UploadZone } from "@/components/upload-zone";
 import { VideoPreview, VideoPreviewHandle } from "@/components/video-preview";
 import { StyleControls } from "@/components/style-controls";
-import { ExportPanel } from "@/components/export-panel";
-import { BatchPanel } from "@/components/batch-panel";
+
 import { SubtitleEditor } from "@/components/subtitle-editor";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -128,6 +127,22 @@ export default function Home() {
 
   const [activeCueIndex, setActiveCueIndex] = useState<number | null>(null);
   const videoPreviewRef = useRef<VideoPreviewHandle>(null);
+
+  const [showUpload, setShowUpload] = useState(true);
+  const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
+
+  // Auto-collapse upload zone once both files are uploaded for the first time
+  useEffect(() => {
+    if (videoFile && subtitles.length > 0) {
+      if (!hasAutoCollapsed) {
+        setShowUpload(false);
+        setHasAutoCollapsed(true);
+      }
+    } else {
+      setHasAutoCollapsed(false);
+      setShowUpload(true);
+    }
+  }, [videoFile, subtitles.length, hasAutoCollapsed]);
 
   // Load from localStorage on client-side mount
   useEffect(() => {
@@ -298,15 +313,49 @@ export default function Home() {
       <main className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 sm:gap-6 p-2 sm:p-6 overflow-x-hidden">
         {/* ── Upload section ─────────────────────────────────────── */}
         <section>
-          <UploadZone
-            videoFile={videoFile}
-            srtFile={srtFile}
-            onVideoUpload={handleVideoUpload}
-            onSrtUpload={handleSrtUpload}
-            onVideoRemove={handleVideoRemove}
-            onSrtRemove={handleSrtRemove}
-            disabled={isProcessing}
-          />
+          {showUpload ? (
+            <div className="relative">
+              {videoFile && subtitles.length > 0 && (
+                <div className="absolute right-3 top-3 z-20">
+                  <button
+                    onClick={() => setShowUpload(false)}
+                    className="flex items-center gap-1 rounded-lg bg-black/60 px-2.5 py-1.5 text-[10px] font-medium text-white/50 border border-white/10 backdrop-blur-sm transition-colors hover:bg-black/80 hover:text-white"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+                    Collapse
+                  </button>
+                </div>
+              )}
+              <UploadZone
+                videoFile={videoFile}
+                srtFile={srtFile}
+                onVideoUpload={handleVideoUpload}
+                onSrtUpload={handleSrtUpload}
+                onVideoRemove={handleVideoRemove}
+                onSrtRemove={handleSrtRemove}
+                disabled={isProcessing}
+              />
+            </div>
+          ) : (
+            <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.01] px-4 py-3 backdrop-blur-sm">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-7 items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/10 shrink-0">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Files Loaded
+                </div>
+                <span className="text-xs text-white/50 truncate font-medium">
+                  {videoFile?.name || "Video"} · {subtitles.length} Subtitles
+                </span>
+              </div>
+              <button
+                onClick={() => setShowUpload(true)}
+                className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:bg-white/10 hover:text-white shrink-0"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4z"/></svg>
+                Manage Files
+              </button>
+            </div>
+          )}
         </section>
 
         {/* ── Main content area ──────────────────────────────────── */}
@@ -371,18 +420,12 @@ export default function Home() {
                 <aside className="w-full shrink-0 lg:w-[350px]">
                   <div className="lg:sticky lg:top-6 space-y-6 rounded-2xl border border-white/5 bg-white/[0.02] p-3.5 sm:p-5 backdrop-blur-sm">
                     <Tabs defaultValue="subtitles" className="w-full">
-                      <TabsList className="grid w-full grid-cols-4 mb-4 sm:mb-6 bg-white/5 p-1 rounded-lg">
+                      <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6 bg-white/5 p-1 rounded-lg">
                         <TabsTrigger value="subtitles" className="rounded-md text-[10px] sm:text-[11px] px-1 sm:px-2 data-[state=active]:bg-violet-600 data-[state=active]:text-white">
                           Subtitles
                         </TabsTrigger>
                         <TabsTrigger value="styles" className="rounded-md text-[10px] sm:text-[11px] px-1 sm:px-2 data-[state=active]:bg-violet-600 data-[state=active]:text-white">
                           Styling
-                        </TabsTrigger>
-                        <TabsTrigger value="export" className="rounded-md text-[10px] sm:text-[11px] px-1 sm:px-2 data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                          Export
-                        </TabsTrigger>
-                        <TabsTrigger value="batch" className="rounded-md text-[10px] sm:text-[11px] px-1 sm:px-2 data-[state=active]:bg-violet-600 data-[state=active]:text-white">
-                          Batch
                         </TabsTrigger>
                       </TabsList>
 
@@ -415,29 +458,7 @@ export default function Home() {
                         </ErrorBoundary>
                       </TabsContent>
 
-                      <TabsContent value="export" className="mt-0">
-                        <ErrorBoundary>
-                          <ExportPanel
-                            videoFile={videoFile}
-                            subtitles={subtitles}
-                            style={style}
-                            exportSettings={exportSettings}
-                            onExportSettingsChange={(s) => dispatch({ type: "SET_EXPORT_SETTINGS", settings: s })}
-                            disabled={isProcessing}
-                          />
-                        </ErrorBoundary>
-                      </TabsContent>
 
-                      <TabsContent value="batch" className="mt-0">
-                        <ErrorBoundary>
-                          <BatchPanel
-                            subtitles={subtitles}
-                            style={style}
-                            exportSettings={exportSettings}
-                            disabled={isProcessing}
-                          />
-                        </ErrorBoundary>
-                      </TabsContent>
                     </Tabs>
                   </div>
                 </aside>
