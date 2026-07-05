@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import { SubtitleCue, SubtitleStyle, AspectRatioOption, ASPECT_RATIO_MAP } from "@/types";
 import { getActiveCue } from "@/lib/srt-parser";
+import { toast } from "sonner";
 
 declare global {
   interface Window {
@@ -41,21 +42,35 @@ function loadYoutubeApi(): Promise<void> {
       return;
     }
 
-    const existingScript = document.querySelector(
-      'script[src="https://www.youtube.com/iframe_api"]'
-    );
+    const checkInterval = setInterval(() => {
+      if (window.YT && window.YT.Player) {
+        clearInterval(checkInterval);
+        resolve();
+      }
+    }, 100);
 
     const originalCallback = window.onYouTubeIframeAPIReady;
     window.onYouTubeIframeAPIReady = () => {
       if (originalCallback) originalCallback();
-      resolve();
+      if (window.YT && window.YT.Player) {
+        clearInterval(checkInterval);
+        resolve();
+      }
     };
+
+    const existingScript = document.querySelector(
+      'script[src="https://www.youtube.com/iframe_api"]'
+    );
 
     if (!existingScript) {
       const tag = document.createElement("script");
       tag.src = "https://www.youtube.com/iframe_api";
       const firstScriptTag = document.getElementsByTagName("script")[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+      if (firstScriptTag && firstScriptTag.parentNode) {
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      } else {
+        document.head.appendChild(tag);
+      }
     }
   });
 
@@ -181,6 +196,8 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
           }
 
           const player = new window.YT.Player(playerDiv, {
+            width: "100%",
+            height: "100%",
             videoId: youtubeId,
             playerVars: {
               controls: 0,
@@ -208,6 +225,12 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
                 } else if (state === 2 || state === 0 || state === -1) {
                   setIsPlaying(false);
                 }
+              },
+              onError: (event: any) => {
+                console.error("YouTube Player error:", event.data);
+                toast.error("Failed to play YouTube video", {
+                  description: "Make sure the video is public, allows embedding, and the URL is valid.",
+                });
               },
             },
           });
@@ -572,7 +595,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
           <button
             onClick={togglePlay}
             className={`absolute inset-0 flex items-center justify-center bg-transparent transition-all group ${
-              isFullscreen && !showControls ? "pointer-events-none" : ""
+              (isFullscreen && !showControls) || (youtubeId && !isPlaying) ? "pointer-events-none" : ""
             }`}
             aria-label={isPlaying ? "Pause" : "Play"}
           >
