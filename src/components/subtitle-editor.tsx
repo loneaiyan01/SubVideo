@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { SubtitleCue } from "@/types";
+import { SubtitleCue, SubtitleTrack } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,10 @@ import { toast } from "sonner";
 
 interface SubtitleEditorProps {
   subtitles: SubtitleCue[];
+  tracks: SubtitleTrack[];
+  activeTrackId: string | null;
+  onSelectTrack: (id: string) => void;
+  onCopyTimings: (sourceTrackId: string, targetTrackId: string) => void;
   activeCueIndex: number | null;
   onSelectCueTime?: (time: number) => void;
   onAddSubtitle?: () => void;
@@ -26,6 +30,10 @@ interface SubtitleEditorProps {
 
 export function SubtitleEditor({
   subtitles,
+  tracks,
+  activeTrackId,
+  onSelectTrack,
+  onCopyTimings,
   activeCueIndex,
   onSelectCueTime,
   onAddSubtitle,
@@ -43,6 +51,15 @@ export function SubtitleEditor({
   const [replaceQuery, setReplaceQuery] = useState("");
   const [showReplacePanel, setShowReplacePanel] = useState(false);
   const [showSyncPanel, setShowSyncPanel] = useState(false);
+  const [showCopyPanel, setShowCopyPanel] = useState(false);
+  const [copySourceId, setCopySourceId] = useState<string>("");
+
+  useEffect(() => {
+    const otherTracks = tracks.filter((t) => t.id !== activeTrackId);
+    if (otherTracks.length > 0 && (!copySourceId || !otherTracks.some((t) => t.id === copySourceId))) {
+      setCopySourceId(otherTracks[0].id);
+    }
+  }, [tracks, activeTrackId, copySourceId]);
   const containerRef = useRef<HTMLDivElement>(null);
   const initialSubtitlesRef = useRef<SubtitleCue[] | null>(null);
 
@@ -144,6 +161,24 @@ export function SubtitleEditor({
 
   return (
     <div className={`flex flex-col h-full gap-4 ${disabled ? "pointer-events-none opacity-50" : ""}`}>
+      {/* Track Selector at the top of the editor */}
+      {tracks.length > 1 && (
+        <div className="flex items-center gap-2 p-2 bg-white/5 rounded-xl border border-white/5 shrink-0">
+          <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider pl-1 select-none">Language:</span>
+          <select
+            value={activeTrackId || ""}
+            onChange={(e) => onSelectTrack(e.target.value)}
+            className="flex-1 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer font-medium"
+          >
+            {tracks.map((t) => (
+              <option key={t.id} value={t.id} className="bg-zinc-950 text-white text-xs">
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Sleek Toolbar */}
       <div className="flex gap-2 items-center shrink-0">
         <div className="relative flex-1">
@@ -172,6 +207,7 @@ export function SubtitleEditor({
           onClick={() => {
             setShowReplacePanel(!showReplacePanel);
             setShowSyncPanel(false);
+            setShowCopyPanel(false);
           }}
           className={`h-9 w-9 shrink-0 p-0 border-0 flex items-center justify-center rounded-lg transition-colors ${
             showReplacePanel ? "bg-violet-600 text-white" : "bg-white/5 text-white/70 hover:bg-white/10"
@@ -189,6 +225,7 @@ export function SubtitleEditor({
           onClick={() => {
             setShowSyncPanel(!showSyncPanel);
             setShowReplacePanel(false);
+            setShowCopyPanel(false);
           }}
           className={`h-9 w-9 shrink-0 p-0 border-0 flex items-center justify-center rounded-lg transition-colors ${
             showSyncPanel ? "bg-violet-600 text-white" : "bg-white/5 text-white/70 hover:bg-white/10"
@@ -198,6 +235,25 @@ export function SubtitleEditor({
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
+          </svg>
+        </Button>
+
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setShowCopyPanel(!showCopyPanel);
+            setShowReplacePanel(false);
+            setShowSyncPanel(false);
+          }}
+          className={`h-9 w-9 shrink-0 p-0 border-0 flex items-center justify-center rounded-lg transition-colors ${
+            showCopyPanel ? "bg-violet-600 text-white" : "bg-white/5 text-white/70 hover:bg-white/10"
+          }`}
+          title="Copy Timings from Another Track"
+          disabled={tracks.length < 2}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M4 12V8a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v4" />
+            <polyline points="10 9 15 14 10 19" />
           </svg>
         </Button>
 
@@ -279,6 +335,63 @@ export function SubtitleEditor({
             onClick={applySyncShift}
           >
             Apply Shift
+          </Button>
+        </div>
+      )}
+
+      {/* Slide-down Copy Timings Drawer */}
+      {showCopyPanel && tracks.length > 1 && (
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 flex flex-col gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200 shrink-0">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Sync Timings</span>
+            <span className="text-[9px] text-violet-400 bg-violet-400/10 px-1.5 py-0.5 rounded font-semibold">Matches by index</span>
+          </div>
+          <div className="flex gap-2 items-center">
+            <div className="flex-1 flex flex-col gap-1">
+              <label className="text-[9px] text-white/30 font-semibold pl-0.5">Copy Timings From:</label>
+              <select
+                value={copySourceId}
+                onChange={(e) => setCopySourceId(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-md px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer font-medium"
+              >
+                {tracks
+                  .filter((t) => t.id !== activeTrackId)
+                  .map((t) => (
+                    <option key={t.id} value={t.id} className="bg-zinc-950 text-white">
+                      {t.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            
+            <div className="flex-1 flex flex-col gap-1">
+              <label className="text-[9px] text-white/30 font-semibold pl-0.5">Apply to Active Track:</label>
+              <div className="w-full bg-white/5 border border-white/5 rounded-md px-2 py-1.5 text-xs text-white/50 truncate font-semibold">
+                {tracks.find((t) => t.id === activeTrackId)?.name || "Active Track"}
+              </div>
+            </div>
+          </div>
+          
+          <Button
+            variant="secondary"
+            className="w-full h-8 text-xs bg-violet-600 hover:bg-violet-500 text-white border-0 transition-colors rounded-md font-semibold"
+            onClick={() => {
+              const source = tracks.find(t => t.id === copySourceId);
+              const target = tracks.find(t => t.id === activeTrackId);
+              if (source && target) {
+                if (source.subtitles.length !== target.subtitles.length) {
+                  toast.warning("Line count mismatch", {
+                    description: `Source has ${source.subtitles.length} lines, target has ${target.subtitles.length} lines. Timings will copy for the first ${Math.min(source.subtitles.length, target.subtitles.length)} lines.`,
+                  });
+                }
+                onCopyTimings(copySourceId, activeTrackId!);
+                toast.success(`Copied timings from "${source.name}" to "${target.name}"`);
+                setShowCopyPanel(false);
+              }
+            }}
+            disabled={!copySourceId}
+          >
+            Copy Timestamps
           </Button>
         </div>
       )}

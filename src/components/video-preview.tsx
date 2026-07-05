@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
-import { SubtitleCue, SubtitleStyle, AspectRatioOption, ASPECT_RATIO_MAP } from "@/types";
+import { SubtitleCue, SubtitleStyle, AspectRatioOption, ASPECT_RATIO_MAP, SubtitleTrack } from "@/types";
 import { getActiveCue } from "@/lib/srt-parser";
 import { toast } from "sonner";
 
@@ -26,6 +26,9 @@ interface VideoPreviewProps {
   onTimeUpdate?: (time: number) => void;
   onDurationChange?: (duration: number) => void;
   onActiveCueChange?: (index: number | null) => void;
+  tracks?: SubtitleTrack[];
+  activeTrackId?: string | null;
+  onSelectTrack?: (id: string) => void;
 }
 
 let ytApiPromise: Promise<void> | null = null;
@@ -78,7 +81,7 @@ function loadYoutubeApi(): Promise<void> {
 }
 
 export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
-  function VideoPreview({ videoFile, youtubeId, subtitles, style, aspectRatio, onActiveCueChange }: VideoPreviewProps, ref) {
+  function VideoPreview({ videoFile, youtubeId, subtitles, style, aspectRatio, onActiveCueChange, tracks = [], activeTrackId, onSelectTrack }: VideoPreviewProps, ref) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const youtubeContainerRef = useRef<HTMLDivElement>(null);
@@ -94,6 +97,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
     const [duration, setDuration] = useState(0);
     const [playbackRate, setPlaybackRate] = useState(1.0);
     const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+    const [showTrackMenu, setShowTrackMenu] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showControls, setShowControls] = useState(true);
 
@@ -743,6 +747,67 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
               </>
             )}
           </div>
+
+          {/* Subtitle track switcher */}
+          {tracks.length > 1 && (
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setShowTrackMenu(!showTrackMenu)}
+                className="flex items-center gap-1 rounded-lg bg-white/5 px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-[11px] font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white border border-white/10"
+                aria-label="Subtitle track"
+                title="Switch subtitle track"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-75">
+                  <rect width="18" height="14" x="3" y="5" rx="2" ry="2"/>
+                  <path d="M7 10h4M13 10h4M7 14h10"/>
+                </svg>
+                <span className="max-w-[70px] truncate font-medium">
+                  {tracks.find((t) => t.id === activeTrackId)?.name.replace(/\.srt$/i, "") || "CC"}
+                </span>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`transition-transform duration-200 ${showTrackMenu ? "rotate-180" : ""}`}
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+
+              {showTrackMenu && (
+                <>
+                  {/* Backdrop click blocker to close the menu */}
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowTrackMenu(false)}
+                  />
+                  <div className="absolute bottom-full right-0 mb-2 w-36 rounded-lg border border-white/10 bg-zinc-950/95 backdrop-blur-md p-1 shadow-xl z-20 flex flex-col gap-0.5 max-h-[160px] overflow-y-auto custom-scrollbar">
+                    {tracks.map((track) => (
+                      <button
+                        key={track.id}
+                        onClick={() => {
+                          onSelectTrack?.(track.id);
+                          setShowTrackMenu(false);
+                        }}
+                        className={`w-full text-left rounded-md px-2 py-1 text-xs truncate transition-colors ${
+                          activeTrackId === track.id
+                            ? "bg-violet-600 text-white"
+                            : "text-white/70 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        {track.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Fullscreen Button */}
           <button

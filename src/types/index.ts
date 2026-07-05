@@ -100,3 +100,9 @@ export interface BatchItem {
   fileSize: number | null;
   error: string | null;
 }
+
+export interface SubtitleTrack {
+  id: string;
+  name: string;
+  subtitles: SubtitleCue[];
+}

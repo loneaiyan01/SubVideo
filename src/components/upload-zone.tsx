@@ -6,18 +6,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { formatSize, extractYoutubeId } from "@/lib/utils";
-import { ACCEPTED_VIDEO_TYPES } from "@/types";
+import { ACCEPTED_VIDEO_TYPES, SubtitleTrack, SubtitleCue } from "@/types";
 
 interface UploadZoneProps {
   videoFile: File | null;
   youtubeId: string | null;
-  srtFile: File | null;
+  tracks: SubtitleTrack[];
+  activeTrackId: string | null;
   onVideoUpload: (file: File) => void;
   onYoutubeLoad: (id: string) => void;
   onSrtUpload: (file: File) => void;
   onVideoRemove: () => void;
   onYoutubeRemove: () => void;
-  onSrtRemove: () => void;
+  onSelectTrack: (id: string) => void;
+  onRemoveTrack: (id: string) => void;
+  onRenameTrack: (id: string, name: string) => void;
+  onAddTrack: (name: string, subtitles: SubtitleCue[]) => void;
   disabled?: boolean;
 }
 
@@ -178,24 +182,32 @@ function DropZone({
 export function UploadZone({
   videoFile,
   youtubeId,
-  srtFile,
+  tracks,
+  activeTrackId,
   onVideoUpload,
   onYoutubeLoad,
   onSrtUpload,
   onVideoRemove,
   onYoutubeRemove,
-  onSrtRemove,
+  onSelectTrack,
+  onRemoveTrack,
+  onRenameTrack,
+  onAddTrack,
   disabled,
 }: UploadZoneProps) {
   const [pastedSrt, setPastedSrt] = useState("");
   const [youtubeInput, setYoutubeInput] = useState("");
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
 
   const handlePasteSubmit = useCallback(() => {
     if (!pastedSrt.trim()) return;
     const blob = new Blob([pastedSrt], { type: "text/plain" });
-    const file = new File([blob], "pasted_subtitles.srt", { type: "text/plain" });
+    const file = new File([blob], `pasted_subtitles.srt`, { type: "text/plain" });
     onSrtUpload(file);
     setPastedSrt("");
+    setShowUploadForm(false);
   }, [pastedSrt, onSrtUpload]);
 
   const handleYoutubeSubmit = useCallback(() => {
@@ -240,6 +252,7 @@ export function UploadZone({
         return;
       }
       onSrtUpload(file);
+      setShowUploadForm(false);
     },
     [onSrtUpload]
   );
@@ -381,55 +394,161 @@ export function UploadZone({
       </div>
 
       <div className="h-[160px] flex flex-col justify-stretch">
-        {srtFile ? (
-          <DropZone
-            label="SRT file"
-            accept=".srt"
-            icon={srtIcon}
-            file={srtFile}
-            onFile={handleSrtFile}
-            onRemove={onSrtRemove}
-            disabled={disabled}
-            sublabel=".srt subtitle file"
-          />
-        ) : (
-          <Tabs defaultValue="paste" className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 mb-2 bg-white/5 p-1 rounded-lg shrink-0 h-9">
-              <TabsTrigger value="upload" className="rounded-md text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white">Upload .SRT File</TabsTrigger>
-              <TabsTrigger value="paste" className="rounded-md text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white">Paste Raw Text</TabsTrigger>
-            </TabsList>
-            <TabsContent value="upload" className="mt-0 flex-1 h-0">
-              <DropZone
-                label="SRT file"
-                accept=".srt"
-                icon={srtIcon}
-                file={srtFile}
-                onFile={handleSrtFile}
-                onRemove={onSrtRemove}
-                disabled={disabled}
-                sublabel=".srt subtitle file"
-                isCompact
-              />
-            </TabsContent>
-            <TabsContent value="paste" className="mt-0 flex-1 h-0 flex flex-col justify-stretch">
-              <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-2 h-full justify-between">
-                <Textarea 
-                  className="flex-1 resize-none bg-transparent border-0 text-[11px] p-1.5 leading-relaxed text-white/70 font-mono custom-scrollbar focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-hidden"
-                  placeholder={"1\n00:00:00,000 --> 00:00:02,000\nPaste your subtitle text here..."}
-                  value={pastedSrt}
-                  onChange={(e) => setPastedSrt(e.target.value)}
-                  disabled={disabled}
-                />
-                <Button 
-                  onClick={handlePasteSubmit} 
-                  disabled={disabled || !pastedSrt.trim()}
-                  className="w-full text-xs h-7 bg-violet-600 hover:bg-violet-500 text-white border-0 transition-colors shrink-0 rounded-md"
-                >
-                  Parse Subtitles
-                </Button>
+        {tracks.length > 0 && !showUploadForm ? (
+          <div className="flex flex-col h-full rounded-xl border border-white/10 bg-white/[0.03] p-3">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Tracks</span>
+                <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-bold text-white/50">
+                  {tracks.length}
+                </span>
               </div>
-            </TabsContent>
-          </Tabs>
+              <button
+                onClick={() => setShowUploadForm(true)}
+                className="flex items-center gap-1 rounded-md bg-violet-600/10 border border-violet-500/10 px-2 py-1 text-[10px] font-semibold text-violet-400 hover:bg-violet-600/20 hover:text-violet-300 transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Track
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-1 mt-2 pr-1 custom-scrollbar min-h-0">
+              {tracks.map((track) => {
+                const isActive = track.id === activeTrackId;
+                const isEditing = track.id === editingTrackId;
+                return (
+                  <div
+                    key={track.id}
+                    className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition-colors group/row ${
+                      isActive 
+                        ? "bg-violet-600/10 border border-violet-500/10 text-white" 
+                        : "hover:bg-white/5 text-white/50 hover:text-white/80"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <button
+                        onClick={() => onSelectTrack(track.id)}
+                        disabled={disabled}
+                        className={`h-2.5 w-2.5 rounded-full shrink-0 transition-colors ${
+                          isActive ? "bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.5)]" : "bg-white/10 hover:bg-white/30"
+                        }`}
+                        title={isActive ? "Active track" : "Set active"}
+                      />
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          className="bg-black/60 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-violet-500 w-full font-medium"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              if (editingName.trim()) {
+                                onRenameTrack(track.id, editingName.trim());
+                              }
+                              setEditingTrackId(null);
+                            } else if (e.key === "Escape") {
+                              setEditingTrackId(null);
+                            }
+                          }}
+                          onBlur={() => {
+                            if (editingName.trim()) {
+                              onRenameTrack(track.id, editingName.trim());
+                            }
+                            setEditingTrackId(null);
+                          }}
+                        />
+                      ) : (
+                        <span
+                          onClick={() => onSelectTrack(track.id)}
+                          className="truncate text-xs cursor-pointer font-medium select-none flex-1"
+                        >
+                          {track.name}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {!isEditing && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => {
+                            setEditingTrackId(track.id);
+                            setEditingName(track.name);
+                          }}
+                          disabled={disabled}
+                          className="rounded p-1 text-white/30 hover:bg-white/10 hover:text-white transition-colors"
+                          title="Rename track"
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        </button>
+                        <button
+                          onClick={() => {
+                            onRemoveTrack(track.id);
+                          }}
+                          disabled={disabled}
+                          className="rounded p-1 text-white/30 hover:bg-white/10 hover:text-red-400 transition-colors"
+                          title="Delete track"
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col h-full justify-stretch">
+            {tracks.length > 0 && (
+              <div className="flex justify-end mb-1 shrink-0">
+                <button
+                  onClick={() => setShowUploadForm(false)}
+                  className="text-[10px] font-semibold text-violet-400 hover:text-violet-300 transition-colors flex items-center gap-0.5"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Back to Tracks
+                </button>
+              </div>
+            )}
+            <Tabs defaultValue="upload" className="w-full h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 mb-2 bg-white/5 p-1 rounded-lg shrink-0 h-9">
+                <TabsTrigger value="upload" className="rounded-md text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white">Upload .SRT File</TabsTrigger>
+                <TabsTrigger value="paste" className="rounded-md text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white">Paste Raw Text</TabsTrigger>
+              </TabsList>
+              <TabsContent value="upload" className="mt-0 flex-1 h-0">
+                <DropZone
+                  label="SRT file"
+                  accept=".srt"
+                  icon={srtIcon}
+                  file={null}
+                  onFile={handleSrtFile}
+                  onRemove={() => {}}
+                  disabled={disabled}
+                  sublabel=".srt subtitle file"
+                  isCompact
+                />
+              </TabsContent>
+              <TabsContent value="paste" className="mt-0 flex-1 h-0 flex flex-col justify-stretch">
+                <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-2 h-full justify-between">
+                  <Textarea 
+                    className="flex-1 resize-none bg-transparent border-0 text-[11px] p-1.5 leading-relaxed text-white/70 font-mono custom-scrollbar focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-hidden"
+                    placeholder={"1\n00:00:00,000 --> 00:00:02,000\nPaste your subtitle text here..."}
+                    value={pastedSrt}
+                    onChange={(e) => setPastedSrt(e.target.value)}
+                    disabled={disabled}
+                  />
+                  <Button 
+                    onClick={handlePasteSubmit} 
+                    disabled={disabled || !pastedSrt.trim()}
+                    className="w-full text-xs h-7 bg-violet-600 hover:bg-violet-500 text-white border-0 transition-colors shrink-0 rounded-md"
+                  >
+                    Parse Subtitles
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
         )}
       </div>
     </div>

@@ -15,6 +15,7 @@ import {
   ExportSettings,
   DEFAULT_STYLE,
   DEFAULT_EXPORT_SETTINGS,
+  SubtitleTrack,
 } from "@/types";
 import { parseSRT } from "@/lib/srt-parser";
 import { toast } from "sonner";
@@ -24,7 +25,8 @@ import { extractYoutubeId } from "@/lib/utils";
 interface AppState {
   videoFile: File | null;
   youtubeId: string | null;
-  srtFile: File | null;
+  tracks: SubtitleTrack[];
+  activeTrackId: string | null;
   subtitles: SubtitleCue[];
   style: SubtitleStyle;
   exportSettings: ExportSettings;
@@ -37,13 +39,18 @@ interface AppState {
 type AppAction =
   | { type: "SET_VIDEO"; file: File | null }
   | { type: "SET_YOUTUBE"; id: string | null }
-  | { type: "SET_SRT"; file: File | null; subtitles: SubtitleCue[] }
+  | { type: "ADD_TRACK"; name: string; subtitles: SubtitleCue[]; select?: boolean }
+  | { type: "DELETE_TRACK"; id: string }
+  | { type: "RENAME_TRACK"; id: string; name: string }
+  | { type: "SELECT_TRACK"; id: string }
   | { type: "SET_SUBTITLES"; subtitles: SubtitleCue[] }
   | { type: "SET_STYLE"; style: SubtitleStyle }
   | { type: "SET_EXPORT_SETTINGS"; settings: ExportSettings }
   | { type: "SET_PROCESSING"; value: boolean }
   | { type: "TOGGLE_SIDEBAR" }
-  | { type: "CLEAR_SRT" }
+  | { type: "CLEAR_ALL_TRACKS" }
+  | { type: "COPY_TIMINGS"; sourceTrackId: string; targetTrackId: string }
+  | { type: "SET_TRACKS_INITIAL"; tracks: SubtitleTrack[]; activeId: string | null }
   | { type: "UNDO_SUBTITLES" }
   | { type: "REDO_SUBTITLES" }
   | { type: "PUSH_SUBTITLES_HISTORY"; subtitlesBefore: SubtitleCue[] };
@@ -51,7 +58,8 @@ type AppAction =
 const initialState: AppState = {
   videoFile: null,
   youtubeId: null,
-  srtFile: null,
+  tracks: [],
+  activeTrackId: null,
   subtitles: [],
   style: DEFAULT_STYLE,
   exportSettings: DEFAULT_EXPORT_SETTINGS,
@@ -68,16 +76,135 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case "SET_YOUTUBE":
       return { ...state, youtubeId: action.id, videoFile: null };
 
-    case "SET_SRT":
+    case "ADD_TRACK": {
+      const newTrackId = `track_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newTrack: SubtitleTrack = {
+        id: newTrackId,
+        name: action.name,
+        subtitles: action.subtitles,
+      };
+      const newTracks = [...state.tracks, newTrack];
+      const shouldSelect = action.select ?? (state.tracks.length === 0);
       return {
         ...state,
-        srtFile: action.file,
-        subtitles: action.subtitles,
+        tracks: newTracks,
+        activeTrackId: shouldSelect ? newTrackId : state.activeTrackId,
+        subtitles: shouldSelect ? action.subtitles : state.subtitles,
+        pastSubtitles: shouldSelect ? [] : state.pastSubtitles,
+        futureSubtitles: shouldSelect ? [] : state.futureSubtitles,
+      };
+    }
+    case "DELETE_TRACK": {
+      const newTracks = state.tracks.filter((t) => t.id !== action.id);
+      let newActiveId = state.activeTrackId;
+      let newSubtitles = state.subtitles;
+      let newPast = state.pastSubtitles;
+      let newFuture = state.futureSubtitles;
+
+      if (state.activeTrackId === action.id) {
+        if (newTracks.length > 0) {
+          newActiveId = newTracks[0].id;
+          newSubtitles = newTracks[0].subtitles;
+        } else {
+          newActiveId = null;
+          newSubtitles = [];
+        }
+        newPast = [];
+        newFuture = [];
+      }
+      return {
+        ...state,
+        tracks: newTracks,
+        activeTrackId: newActiveId,
+        subtitles: newSubtitles,
+        pastSubtitles: newPast,
+        futureSubtitles: newFuture,
+      };
+    }
+    case "RENAME_TRACK": {
+      const newTracks = state.tracks.map((t) =>
+        t.id === action.id ? { ...t, name: action.name } : t
+      );
+      return {
+        ...state,
+        tracks: newTracks,
+      };
+    }
+    case "SELECT_TRACK": {
+      const selectedTrack = state.tracks.find((t) => t.id === action.id);
+      if (!selectedTrack) return state;
+      return {
+        ...state,
+        activeTrackId: action.id,
+        subtitles: selectedTrack.subtitles,
         pastSubtitles: [],
         futureSubtitles: [],
       };
-    case "SET_SUBTITLES":
-      return { ...state, subtitles: action.subtitles };
+    }
+    case "SET_SUBTITLES": {
+      const newTracks = state.tracks.map((t) =>
+        t.id === state.activeTrackId ? { ...t, subtitles: action.subtitles } : t
+      );
+      return {
+        ...state,
+        subtitles: action.subtitles,
+        tracks: newTracks,
+      };
+    }
+    case "SET_TRACKS_INITIAL":
+      return {
+        ...state,
+        tracks: action.tracks,
+        activeTrackId: action.activeId,
+        subtitles: action.tracks.find(t => t.id === action.activeId)?.subtitles || [],
+        pastSubtitles: [],
+        futureSubtitles: [],
+      };
+    case "CLEAR_ALL_TRACKS":
+      return {
+        ...state,
+        tracks: [],
+        activeTrackId: null,
+        subtitles: [],
+        pastSubtitles: [],
+        futureSubtitles: [],
+      };
+    case "COPY_TIMINGS": {
+      const sourceTrack = state.tracks.find((t) => t.id === action.sourceTrackId);
+      const targetTrack = state.tracks.find((t) => t.id === action.targetTrackId);
+      if (!sourceTrack || !targetTrack) return state;
+
+      let updatedPast = state.pastSubtitles;
+      if (state.activeTrackId === action.targetTrackId) {
+        updatedPast = [...state.pastSubtitles, state.subtitles];
+      }
+
+      const newTargetSubtitles = targetTrack.subtitles.map((cue, idx) => {
+        const sourceCue = sourceTrack.subtitles[idx];
+        if (sourceCue) {
+          return {
+            ...cue,
+            startTime: sourceCue.startTime,
+            endTime: sourceCue.endTime,
+          };
+        }
+        return cue;
+      });
+
+      const newTracks = state.tracks.map((t) =>
+        t.id === action.targetTrackId ? { ...t, subtitles: newTargetSubtitles } : t
+      );
+
+      const isTargetActive = state.activeTrackId === action.targetTrackId;
+
+      return {
+        ...state,
+        tracks: newTracks,
+        subtitles: isTargetActive ? newTargetSubtitles : state.subtitles,
+        pastSubtitles: updatedPast,
+        futureSubtitles: isTargetActive ? [] : state.futureSubtitles,
+      };
+    }
     case "SET_STYLE":
       return { ...state, style: action.style };
     case "SET_EXPORT_SETTINGS":
@@ -86,14 +213,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, isProcessing: action.value };
     case "TOGGLE_SIDEBAR":
       return { ...state, isSidebarOpen: !state.isSidebarOpen };
-    case "CLEAR_SRT":
-      return {
-        ...state,
-        srtFile: null,
-        subtitles: [],
-        pastSubtitles: [],
-        futureSubtitles: [],
-      };
     case "PUSH_SUBTITLES_HISTORY":
       return {
         ...state,
@@ -104,22 +223,30 @@ function appReducer(state: AppState, action: AppAction): AppState {
       if (state.pastSubtitles.length === 0) return state;
       const newPast = [...state.pastSubtitles];
       const previous = newPast.pop()!;
+      const newTracks = state.tracks.map((t) =>
+        t.id === state.activeTrackId ? { ...t, subtitles: previous } : t
+      );
       return {
         ...state,
         pastSubtitles: newPast,
         futureSubtitles: [...state.futureSubtitles, state.subtitles],
         subtitles: previous,
+        tracks: newTracks,
       };
     }
     case "REDO_SUBTITLES": {
       if (state.futureSubtitles.length === 0) return state;
       const newFuture = [...state.futureSubtitles];
       const next = newFuture.pop()!;
+      const newTracks = state.tracks.map((t) =>
+        t.id === state.activeTrackId ? { ...t, subtitles: next } : t
+      );
       return {
         ...state,
         pastSubtitles: [...state.pastSubtitles, state.subtitles],
         futureSubtitles: newFuture,
         subtitles: next,
+        tracks: newTracks,
       };
     }
     default:
@@ -130,7 +257,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 // ── Component ─────────────────────────────────────────────────────
 export default function Home() {
   const [state, dispatch] = useReducer(appReducer, initialState);
-  const { videoFile, youtubeId, srtFile, subtitles, style, exportSettings, isProcessing, isSidebarOpen, pastSubtitles, futureSubtitles } = state;
+  const { videoFile, youtubeId, tracks, activeTrackId, subtitles, style, exportSettings, isProcessing, isSidebarOpen, pastSubtitles, futureSubtitles } = state;
 
   const [activeCueIndex, setActiveCueIndex] = useState<number | null>(null);
   const videoPreviewRef = useRef<VideoPreviewHandle>(null);
@@ -153,19 +280,42 @@ export default function Home() {
 
   // Load from localStorage on client-side mount
   useEffect(() => {
+    const savedTracks = localStorage.getItem("subvideo_tracks");
+    const savedActiveTrackId = localStorage.getItem("subvideo_active_track_id");
     const savedSubtitles = localStorage.getItem("subvideo_subtitles");
     const savedStyle = localStorage.getItem("subvideo_style");
     const savedExportSettings = localStorage.getItem("subvideo_export_settings");
     const savedYoutubeId = localStorage.getItem("subvideo_youtube_id");
 
-    if (savedSubtitles) {
+    if (savedTracks) {
+      try {
+        const parsed = JSON.parse(savedTracks);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          let activeId = savedActiveTrackId;
+          const hasActive = parsed.some(t => t.id === activeId);
+          if (!hasActive) {
+            activeId = parsed[0].id;
+          }
+          dispatch({ type: "SET_TRACKS_INITIAL", tracks: parsed, activeId });
+        }
+      } catch (e) {
+        console.error("Failed to parse saved tracks", e);
+      }
+    } else if (savedSubtitles) {
+      // Migrate from single subtitle format
       try {
         const parsed = JSON.parse(savedSubtitles);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          dispatch({ type: "SET_SUBTITLES", subtitles: parsed });
+          const trackId = `track_${Date.now()}`;
+          const initialTracks: SubtitleTrack[] = [{
+            id: trackId,
+            name: "Subtitles.srt",
+            subtitles: parsed
+          }];
+          dispatch({ type: "SET_TRACKS_INITIAL", tracks: initialTracks, activeId: trackId });
         }
       } catch (e) {
-        console.error("Failed to parse saved subtitles", e);
+        console.error("Failed to parse migrated subtitles", e);
       }
     }
 
@@ -197,17 +347,22 @@ export default function Home() {
     }
   }, []);
 
-  // Debounced auto-save for subtitles
+  // Debounced auto-save for tracks
   useEffect(() => {
-    if (subtitles.length === 0) {
+    if (tracks.length === 0) {
+      localStorage.removeItem("subvideo_tracks");
+      localStorage.removeItem("subvideo_active_track_id");
       localStorage.removeItem("subvideo_subtitles");
       return;
     }
     const timer = setTimeout(() => {
-      localStorage.setItem("subvideo_subtitles", JSON.stringify(subtitles));
+      localStorage.setItem("subvideo_tracks", JSON.stringify(tracks));
+      if (activeTrackId) {
+        localStorage.setItem("subvideo_active_track_id", activeTrackId);
+      }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [subtitles]);
+  }, [tracks, activeTrackId]);
 
   // Auto-save styling
   useEffect(() => {
@@ -321,15 +476,28 @@ export default function Home() {
         description: "The file may not be a valid SRT format.",
       });
     }
-    dispatch({ type: "SET_SRT", file, subtitles: parsed });
+    dispatch({ type: "ADD_TRACK", name: file.name, subtitles: parsed, select: true });
+    toast.success(`Loaded track: ${file.name}`);
   }, []);
 
   const handleVideoRemove = useCallback(() => {
     dispatch({ type: "SET_VIDEO", file: null });
   }, []);
 
-  const handleSrtRemove = useCallback(() => {
-    dispatch({ type: "CLEAR_SRT" });
+  const handleSelectTrack = useCallback((id: string) => {
+    dispatch({ type: "SELECT_TRACK", id });
+  }, []);
+
+  const handleRemoveTrack = useCallback((id: string) => {
+    dispatch({ type: "DELETE_TRACK", id });
+  }, []);
+
+  const handleRenameTrack = useCallback((id: string, name: string) => {
+    dispatch({ type: "RENAME_TRACK", id, name });
+  }, []);
+
+  const handleAddTrack = useCallback((name: string, trackSubs: SubtitleCue[]) => {
+    dispatch({ type: "ADD_TRACK", name, subtitles: trackSubs, select: true });
   }, []);
 
   const hasFiles = videoFile !== null || youtubeId !== null || subtitles.length > 0;
@@ -363,13 +531,17 @@ export default function Home() {
               <UploadZone
                 videoFile={videoFile}
                 youtubeId={youtubeId}
-                srtFile={srtFile}
+                tracks={tracks}
+                activeTrackId={activeTrackId}
                 onVideoUpload={handleVideoUpload}
                 onYoutubeLoad={handleYoutubeLoad}
                 onSrtUpload={handleSrtUpload}
                 onVideoRemove={handleVideoRemove}
                 onYoutubeRemove={handleYoutubeRemove}
-                onSrtRemove={handleSrtRemove}
+                onSelectTrack={handleSelectTrack}
+                onRemoveTrack={handleRemoveTrack}
+                onRenameTrack={handleRenameTrack}
+                onAddTrack={handleAddTrack}
                 disabled={isProcessing}
               />
             </div>
@@ -381,7 +553,7 @@ export default function Home() {
                   Files Loaded
                 </div>
                 <span className="text-xs text-white/50 truncate font-medium">
-                  {videoFile ? videoFile.name : youtubeId ? `YouTube Video (${youtubeId})` : "Video"} · {subtitles.length} Subtitles
+                  {videoFile ? videoFile.name : youtubeId ? `YouTube Video (${youtubeId})` : "Video"} · {tracks.length} Subtitle Tracks
                 </span>
               </div>
               <button
@@ -411,6 +583,9 @@ export default function Home() {
                       style={style}
                       aspectRatio={exportSettings.aspectRatio}
                       onActiveCueChange={handleActiveCueChange}
+                      tracks={tracks}
+                      activeTrackId={activeTrackId}
+                      onSelectTrack={handleSelectTrack}
                     />
                   </ErrorBoundary>
                   {subtitles.length > 0 && (
@@ -430,7 +605,7 @@ export default function Home() {
                           <line x1="12" y1="16" x2="12" y2="12" />
                           <line x1="12" y1="8" x2="12.01" y2="8" />
                         </svg>
-                        {subtitles.length} subtitles loaded
+                        {tracks.find(t => t.id === activeTrackId)?.name || "Subtitles"} ({subtitles.length} cues)
                       </div>
                       <button
                         onClick={() => dispatch({ type: "TOGGLE_SIDEBAR" })}
@@ -471,6 +646,10 @@ export default function Home() {
                         <ErrorBoundary>
                           <SubtitleEditor
                             subtitles={subtitles}
+                            tracks={tracks}
+                            activeTrackId={activeTrackId}
+                            onSelectTrack={handleSelectTrack}
+                            onCopyTimings={(source, target) => dispatch({ type: "COPY_TIMINGS", sourceTrackId: source, targetTrackId: target })}
                             activeCueIndex={activeCueIndex}
                             onSelectCueTime={handleSelectCueTime}
                             onAddSubtitle={handleAddSubtitle}
