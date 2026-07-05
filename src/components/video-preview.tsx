@@ -536,9 +536,12 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
           }`}
         >
           {youtubeId ? (
-            <div className={`absolute inset-0 w-full h-full flex items-center justify-center ${isPlaying ? 'pointer-events-none' : 'pointer-events-auto'}`}>
-              <div ref={youtubeRef} className="w-full h-full aspect-video" />
-            </div>
+            <div 
+              ref={youtubeContainerRef} 
+              className={`absolute inset-0 w-full h-full flex items-center justify-center ${
+                isPlaying ? 'pointer-events-none' : 'pointer-events-auto'
+              }`} 
+            />
           ) : (
             <video
               ref={videoRef}
