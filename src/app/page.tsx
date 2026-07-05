@@ -650,6 +650,9 @@ export default function Home() {
                             activeTrackId={activeTrackId}
                             onSelectTrack={handleSelectTrack}
                             onCopyTimings={(source, target) => dispatch({ type: "COPY_TIMINGS", sourceTrackId: source, targetTrackId: target })}
+                            onRenameTrack={handleRenameTrack}
+                            onRemoveTrack={handleRemoveTrack}
+                            onAddTrack={handleAddTrack}
                             activeCueIndex={activeCueIndex}
                             onSelectCueTime={handleSelectCueTime}
                             onAddSubtitle={handleAddSubtitle}

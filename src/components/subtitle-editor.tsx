@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
-import { serializeSRT, formatSrtTimestamp } from "@/lib/srt-parser";
+import { serializeSRT, formatSrtTimestamp, parseSRT } from "@/lib/srt-parser";
 import { toast } from "sonner";
 
 interface SubtitleEditorProps {
@@ -15,6 +15,9 @@ interface SubtitleEditorProps {
   activeTrackId: string | null;
   onSelectTrack: (id: string) => void;
   onCopyTimings: (sourceTrackId: string, targetTrackId: string) => void;
+  onRenameTrack?: (id: string, name: string) => void;
+  onRemoveTrack?: (id: string) => void;
+  onAddTrack?: (name: string, subtitles: SubtitleCue[]) => void;
   activeCueIndex: number | null;
   onSelectCueTime?: (time: number) => void;
   onAddSubtitle?: () => void;
@@ -34,6 +37,9 @@ export function SubtitleEditor({
   activeTrackId,
   onSelectTrack,
   onCopyTimings,
+  onRenameTrack,
+  onRemoveTrack,
+  onAddTrack,
   activeCueIndex,
   onSelectCueTime,
   onAddSubtitle,
@@ -62,6 +68,35 @@ export function SubtitleEditor({
   }, [tracks, activeTrackId, copySourceId]);
   const containerRef = useRef<HTMLDivElement>(null);
   const initialSubtitlesRef = useRef<SubtitleCue[] | null>(null);
+  const sidebarFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSidebarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("SRT file too large", {
+        description: "Subtitle files should typically be under 1MB.",
+      });
+      return;
+    }
+    const text = await file.text();
+    const parsed = parseSRT(text);
+    if (parsed.length === 0) {
+      toast.warning("No subtitles found", {
+        description: "The file may not be a valid SRT format.",
+      });
+    }
+    onAddTrack?.(file.name, parsed);
+    toast.success(`Loaded track: ${file.name}`);
+    e.target.value = "";
+  };
+
+  const handleCreateEmptyTrack = () => {
+    const name = `Track ${tracks.length + 1}.srt`;
+    onAddTrack?.(name, []);
+    toast.success(`Created empty track: ${name}`);
+  };
 
   const filteredSubtitles = subtitles.filter((cue) =>
     cue.text.toLowerCase().includes(searchQuery.toLowerCase())
@@ -161,21 +196,91 @@ export function SubtitleEditor({
 
   return (
     <div className={`flex flex-col h-full gap-4 ${disabled ? "pointer-events-none opacity-50" : ""}`}>
-      {/* Track Selector at the top of the editor */}
-      {tracks.length > 1 && (
-        <div className="flex items-center gap-2 p-2 bg-white/5 rounded-xl border border-white/5 shrink-0">
-          <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider pl-1 select-none">Language:</span>
-          <select
-            value={activeTrackId || ""}
-            onChange={(e) => onSelectTrack(e.target.value)}
-            className="flex-1 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer font-medium"
-          >
-            {tracks.map((t) => (
-              <option key={t.id} value={t.id} className="bg-zinc-950 text-white text-xs">
-                {t.name}
-              </option>
-            ))}
-          </select>
+      {/* Track Manager at the top of the editor */}
+      {tracks.length >= 1 && (
+        <div className="flex flex-col gap-2 p-2 bg-white/5 rounded-xl border border-white/5 shrink-0">
+          <div className="flex items-center justify-between pl-1">
+            <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider select-none">Subtitle Tracks</span>
+            
+            <div className="flex items-center gap-1.5">
+              {/* File upload button */}
+              <button
+                onClick={() => sidebarFileInputRef.current?.click()}
+                className="p-1 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+                title="Upload Another Subtitle File"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </button>
+              <input
+                ref={sidebarFileInputRef}
+                type="file"
+                accept=".srt"
+                onChange={handleSidebarFileUpload}
+                className="hidden"
+              />
+
+              {/* Create empty track button */}
+              <button
+                onClick={handleCreateEmptyTrack}
+                className="p-1 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+                title="Create Empty Subtitle Track"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex gap-1.5 items-center">
+            <select
+              value={activeTrackId || ""}
+              onChange={(e) => onSelectTrack(e.target.value)}
+              className="flex-1 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer font-medium"
+            >
+              {tracks.map((t) => (
+                <option key={t.id} value={t.id} className="bg-zinc-950 text-white text-xs">
+                  {t.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Quick action buttons for active track */}
+            <button
+              onClick={() => {
+                if (activeTrackId) {
+                  const track = tracks.find(t => t.id === activeTrackId);
+                  if (track) {
+                    const newName = window.prompt("Rename subtitle track:", track.name);
+                    if (newName && newName.trim()) {
+                      onRenameTrack?.(activeTrackId, newName.trim());
+                    }
+                  }
+                }
+              }}
+              className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+              title="Rename Active Track"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </button>
+
+            <button
+              onClick={() => {
+                if (activeTrackId && confirm("Are you sure you want to delete this track?")) {
+                  onRemoveTrack?.(activeTrackId);
+                }
+              }}
+              className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-red-400/70 hover:text-red-400 transition-colors"
+              title="Delete Active Track"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
+          </div>
         </div>
       )}
 
