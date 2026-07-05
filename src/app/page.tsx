@@ -573,7 +573,7 @@ export default function Home() {
             <section className={`flex flex-1 flex-col gap-4 sm:gap-6 ${isSidebarOpen ? 'lg:flex-row' : 'lg:flex-col'}`}>
               {/* Video Preview - takes 70% on desktop */}
               <div className="flex-1 lg:flex-[7]">
-                <div className="lg:sticky lg:top-6">
+                <div className="sticky top-0 z-30 -mx-2 px-2 py-2 bg-background/95 border-b border-white/5 backdrop-blur-md lg:sticky lg:top-6 lg:z-auto lg:bg-transparent lg:border-none lg:mx-0 lg:px-0 lg:py-0">
                   <ErrorBoundary>
                     <VideoPreview
                       ref={videoPreviewRef}

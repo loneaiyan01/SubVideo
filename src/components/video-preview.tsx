@@ -761,8 +761,11 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
                   <rect width="18" height="14" x="3" y="5" rx="2" ry="2"/>
                   <path d="M7 10h4M13 10h4M7 14h10"/>
                 </svg>
-                <span className="max-w-[70px] truncate font-medium">
+                <span className="hidden sm:inline max-w-[70px] truncate font-medium">
                   {tracks.find((t) => t.id === activeTrackId)?.name.replace(/\.srt$/i, "") || "CC"}
+                </span>
+                <span className="sm:hidden font-medium">
+                  CC
                 </span>
                 <svg
                   width="12"
