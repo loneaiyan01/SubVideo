@@ -196,6 +196,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
           }
 
           const player = new window.YT.Player(playerDiv, {
+            host: "https://www.youtube-nocookie.com",
             width: "100%",
             height: "100%",
             videoId: youtubeId,
