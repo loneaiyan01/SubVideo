@@ -4,6 +4,13 @@ import React, { useRef, useState, useEffect, useCallback, useImperativeHandle, f
 import { SubtitleCue, SubtitleStyle, AspectRatioOption, ASPECT_RATIO_MAP } from "@/types";
 import { getActiveCue } from "@/lib/srt-parser";
 
+declare global {
+  interface Window {
+    onYouTubeIframeAPIReady?: () => void;
+    YT?: any;
+  }
+}
+
 export interface VideoPreviewHandle {
   seekTo: (time: number) => void;
   getCurrentTime: () => number;
@@ -11,6 +18,7 @@ export interface VideoPreviewHandle {
 
 interface VideoPreviewProps {
   videoFile: File | null;
+  youtubeId?: string | null;
   subtitles: SubtitleCue[];
   style: SubtitleStyle;
   aspectRatio: AspectRatioOption;
@@ -19,18 +27,76 @@ interface VideoPreviewProps {
   onActiveCueChange?: (index: number | null) => void;
 }
 
+let ytApiPromise: Promise<void> | null = null;
+function loadYoutubeApi(): Promise<void> {
+  if (ytApiPromise) return ytApiPromise;
 
+  ytApiPromise = new Promise<void>((resolve) => {
+    if (typeof window === "undefined") {
+      resolve();
+      return;
+    }
+    if (window.YT && window.YT.Player) {
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector(
+      'script[src="https://www.youtube.com/iframe_api"]'
+    );
+
+    const originalCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      if (originalCallback) originalCallback();
+      resolve();
+    };
+
+    if (!existingScript) {
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName("script")[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+  });
+
+  return ytApiPromise;
+}
 
 export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
-  function VideoPreview({ videoFile, subtitles, style, aspectRatio, onActiveCueChange }: VideoPreviewProps, ref) {
+  function VideoPreview({ videoFile, youtubeId, subtitles, style, aspectRatio, onActiveCueChange }: VideoPreviewProps, ref) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const youtubeRef = useRef<HTMLDivElement>(null);
+    const playerRef = useRef<any>(null);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastActiveCueIndexRef = useRef<number | null>(null);
 
+    const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    const [activeCue, setActiveCue] = useState<SubtitleCue | null>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [isPlayerReady, setIsPlayerReady] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [playbackRate, setPlaybackRate] = useState(1.0);
+    const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showControls, setShowControls] = useState(true);
+
     useImperativeHandle(ref, () => ({
       seekTo: (time: number) => {
-        if (videoRef.current) {
+        if (youtubeId) {
+          if (playerRef.current && isPlayerReady) {
+            playerRef.current.seekTo(time, true);
+            setCurrentTime(time);
+            const active = getActiveCue(subtitles, time);
+            setActiveCue(active);
+            const currentIdx = active ? active.index : null;
+            if (currentIdx !== lastActiveCueIndexRef.current) {
+              lastActiveCueIndexRef.current = currentIdx;
+              onActiveCueChange?.(currentIdx);
+            }
+          }
+        } else if (videoRef.current) {
           videoRef.current.currentTime = time;
           setCurrentTime(time);
           const active = getActiveCue(subtitles, time);
@@ -44,22 +110,23 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
         }
       },
       getCurrentTime: () => {
+        if (youtubeId) {
+          return playerRef.current && typeof playerRef.current.getCurrentTime === "function"
+            ? playerRef.current.getCurrentTime()
+            : currentTime;
+        }
         return videoRef.current?.currentTime ?? 0;
       },
     }));
 
-    const [videoUrl, setVideoUrl] = useState<string | null>(null);
-    const [activeCue, setActiveCue] = useState<SubtitleCue | null>(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
-    const [playbackRate, setPlaybackRate] = useState(1.0);
-    const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [showControls, setShowControls] = useState(true);
-
     // Create object URL for video
     useEffect(() => {
+      // Reset progress states on video change
+      setCurrentTime(0);
+      setDuration(0);
+      setIsPlaying(false);
+      setActiveCue(null);
+
       if (videoFile) {
         const url = URL.createObjectURL(videoFile);
         setVideoUrl(url);
@@ -69,12 +136,106 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
       }
     }, [videoFile]);
 
+    // Handle YouTube Player initialization
+    useEffect(() => {
+      if (!youtubeId) {
+        if (playerRef.current) {
+          playerRef.current.destroy();
+          playerRef.current = null;
+        }
+        setIsPlayerReady(false);
+        return;
+      }
+
+      // Reset progress states on YouTube change
+      setCurrentTime(0);
+      setDuration(0);
+      setIsPlaying(false);
+      setActiveCue(null);
+
+      let active = true;
+
+      loadYoutubeApi().then(() => {
+        if (!active) return;
+
+        if (playerRef.current) {
+          playerRef.current.destroy();
+          playerRef.current = null;
+        }
+
+        const player = new window.YT.Player(youtubeRef.current, {
+          videoId: youtubeId,
+          playerVars: {
+            controls: 0,
+            disablekb: 1,
+            fs: 0,
+            rel: 0,
+            modestbranding: 1,
+            playsinline: 1,
+            wmode: "opaque",
+          },
+          events: {
+            onReady: (event: any) => {
+              if (!active) return;
+              playerRef.current = event.target;
+              setIsPlayerReady(true);
+              setDuration(event.target.getDuration());
+              event.target.setPlaybackRate(playbackRate);
+            },
+            onStateChange: (event: any) => {
+              if (!active) return;
+              const state = event.data;
+              // YT.PlayerState: PLAYING (1), PAUSED (2), ENDED (0), BUFFERING (3), CUED (5), UNSTARTED (-1)
+              if (state === 1) {
+                setIsPlaying(true);
+              } else if (state === 2 || state === 0 || state === -1) {
+                setIsPlaying(false);
+              }
+            },
+          },
+        });
+      });
+
+      return () => {
+        active = false;
+      };
+    }, [youtubeId]);
+
     // Synchronize playback rate
     useEffect(() => {
-      if (videoRef.current) {
+      if (youtubeId && playerRef.current && isPlayerReady) {
+        if (typeof playerRef.current.setPlaybackRate === "function") {
+          playerRef.current.setPlaybackRate(playbackRate);
+        }
+      } else if (videoRef.current) {
         videoRef.current.playbackRate = playbackRate;
       }
-    }, [playbackRate, videoUrl]);
+    }, [playbackRate, videoUrl, youtubeId, isPlayerReady]);
+
+    // Polling loop for YouTube currentTime syncing
+    useEffect(() => {
+      let intervalId: NodeJS.Timeout;
+      if (youtubeId && playerRef.current && isPlaying && isPlayerReady) {
+        intervalId = setInterval(() => {
+          if (playerRef.current && typeof playerRef.current.getCurrentTime === "function") {
+            const time = playerRef.current.getCurrentTime();
+            setCurrentTime(time);
+
+            const cue = getActiveCue(subtitles, time);
+            setActiveCue(cue);
+
+            const currentIdx = cue ? cue.index : null;
+            if (currentIdx !== lastActiveCueIndexRef.current) {
+              lastActiveCueIndexRef.current = currentIdx;
+              onActiveCueChange?.(currentIdx);
+            }
+          }
+        }, 100);
+      }
+      return () => {
+        if (intervalId) clearInterval(intervalId);
+      };
+    }, [youtubeId, isPlaying, isPlayerReady, subtitles, onActiveCueChange]);
 
     // Sync fullscreen state
     useEffect(() => {
@@ -87,7 +248,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
       };
     }, []);
 
-    // Track current time and find active subtitle
+    // Track current time and find active subtitle for local video
     const handleTimeUpdate = useCallback(() => {
       if (videoRef.current) {
         const time = videoRef.current.currentTime;
@@ -111,7 +272,18 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
     }, [playbackRate]);
 
     const togglePlay = useCallback(() => {
-      if (videoRef.current) {
+      if (youtubeId) {
+        if (playerRef.current && isPlayerReady) {
+          const state = playerRef.current.getPlayerState();
+          if (state === 1) { // PLAYING
+            playerRef.current.pauseVideo();
+            setIsPlaying(false);
+          } else {
+            playerRef.current.playVideo();
+            setIsPlaying(true);
+          }
+        }
+      } else if (videoRef.current) {
         if (videoRef.current.paused) {
           videoRef.current.play();
           setIsPlaying(true);
@@ -120,18 +292,27 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
           setIsPlaying(false);
         }
       }
-    }, []);
+    }, [youtubeId, isPlayerReady]);
 
     const handleSeek = useCallback(
       (e: React.MouseEvent<HTMLDivElement>) => {
-        if (videoRef.current && duration > 0) {
+        if (duration > 0) {
           const rect = e.currentTarget.getBoundingClientRect();
           const x = e.clientX - rect.left;
-          const pct = x / rect.width;
-          videoRef.current.currentTime = pct * duration;
+          const pct = Math.max(0, Math.min(1, x / rect.width));
+          const targetTime = pct * duration;
+
+          if (youtubeId) {
+            if (playerRef.current && isPlayerReady) {
+              playerRef.current.seekTo(targetTime, true);
+              setCurrentTime(targetTime);
+            }
+          } else if (videoRef.current) {
+            videoRef.current.currentTime = targetTime;
+          }
         }
       },
-      [duration]
+      [duration, youtubeId, isPlayerReady]
     );
 
     const toggleFullscreen = useCallback(() => {
@@ -185,7 +366,8 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
 
     const handleKeyDown = useCallback(
       (e: KeyboardEvent) => {
-        if (!videoRef.current || !videoUrl) return;
+        const hasVideo = videoUrl || youtubeId;
+        if (!hasVideo) return;
 
         // Skip if user is typing in inputs or textareas
         const active = document.activeElement as HTMLElement | null;
@@ -200,13 +382,29 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
 
         if (e.key === "ArrowLeft") {
           e.preventDefault();
-          videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5);
+          const targetTime = Math.max(0, currentTime - 5);
+          if (youtubeId) {
+            if (playerRef.current && isPlayerReady) {
+              playerRef.current.seekTo(targetTime, true);
+              setCurrentTime(targetTime);
+            }
+          } else if (videoRef.current) {
+            videoRef.current.currentTime = targetTime;
+          }
         } else if (e.key === "ArrowRight") {
           e.preventDefault();
-          videoRef.current.currentTime = Math.min(duration, videoRef.current.currentTime + 5);
+          const targetTime = Math.min(duration, currentTime + 5);
+          if (youtubeId) {
+            if (playerRef.current && isPlayerReady) {
+              playerRef.current.seekTo(targetTime, true);
+              setCurrentTime(targetTime);
+            }
+          } else if (videoRef.current) {
+            videoRef.current.currentTime = targetTime;
+          }
         }
       },
-      [duration, videoUrl]
+      [duration, youtubeId, isPlayerReady, currentTime, videoUrl]
     );
 
     useEffect(() => {
@@ -235,7 +433,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
     }
 
     const actualTop = topOffset + (style.positionY / 100) * visibleHeight;
-    const showCropOverlay = targetRatio !== null && videoRef.current;
+    const showCropOverlay = targetRatio !== null && (videoRef.current !== null || (youtubeId !== undefined && youtubeId !== null));
 
     // Subtitle overlay style
     const overlayStyle: React.CSSProperties = {
@@ -266,7 +464,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
       transition: "all 0.1s ease",
     };
 
-    if (!videoUrl) {
+    if (!videoUrl && !youtubeId) {
       return (
         <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-white/5 bg-white/[0.02]">
           <div className="flex flex-col items-center gap-3 text-white/20">
@@ -282,7 +480,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
             >
               <polygon points="5 3 19 12 5 21 5 3" />
             </svg>
-            <p className="text-sm">Upload a video to preview</p>
+            <p className="text-sm">Upload a video or add YouTube link to preview</p>
           </div>
         </div>
       );
@@ -307,17 +505,23 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
               : "aspect-video w-full max-h-[500px]"
           }`}
         >
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            onEnded={() => setIsPlaying(false)}
-            className="h-full w-full object-contain"
-            playsInline
-          />
+          {youtubeId ? (
+            <div className={`absolute inset-0 w-full h-full flex items-center justify-center ${isPlaying ? 'pointer-events-none' : 'pointer-events-auto'}`}>
+              <div ref={youtubeRef} className="w-full h-full aspect-video" />
+            </div>
+          ) : (
+            <video
+              ref={videoRef}
+              src={videoUrl || undefined}
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => setIsPlaying(false)}
+              className="h-full w-full object-contain"
+              playsInline
+            />
+          )}
 
           {/* ── Aspect ratio crop overlay ───────────────────────── */}
           {showCropOverlay && targetRatio && (

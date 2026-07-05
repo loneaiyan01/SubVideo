@@ -5,15 +5,18 @@ import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { formatSize } from "@/lib/utils";
+import { formatSize, extractYoutubeId } from "@/lib/utils";
 import { ACCEPTED_VIDEO_TYPES } from "@/types";
 
 interface UploadZoneProps {
   videoFile: File | null;
+  youtubeId: string | null;
   srtFile: File | null;
   onVideoUpload: (file: File) => void;
+  onYoutubeLoad: (id: string) => void;
   onSrtUpload: (file: File) => void;
   onVideoRemove: () => void;
+  onYoutubeRemove: () => void;
   onSrtRemove: () => void;
   disabled?: boolean;
 }
@@ -174,14 +177,18 @@ function DropZone({
 
 export function UploadZone({
   videoFile,
+  youtubeId,
   srtFile,
   onVideoUpload,
+  onYoutubeLoad,
   onSrtUpload,
   onVideoRemove,
+  onYoutubeRemove,
   onSrtRemove,
   disabled,
 }: UploadZoneProps) {
   const [pastedSrt, setPastedSrt] = useState("");
+  const [youtubeInput, setYoutubeInput] = useState("");
 
   const handlePasteSubmit = useCallback(() => {
     if (!pastedSrt.trim()) return;
@@ -190,6 +197,20 @@ export function UploadZone({
     onSrtUpload(file);
     setPastedSrt("");
   }, [pastedSrt, onSrtUpload]);
+
+  const handleYoutubeSubmit = useCallback(() => {
+    const trimmed = youtubeInput.trim();
+    if (!trimmed) return;
+    const parsedId = extractYoutubeId(trimmed);
+    if (parsedId) {
+      onYoutubeLoad(parsedId);
+      setYoutubeInput("");
+    } else {
+      toast.error("Invalid YouTube URL or Video ID", {
+        description: "Please paste a valid YouTube video link or an 11-character video ID.",
+      });
+    }
+  }, [youtubeInput, onYoutubeLoad]);
 
   const handleVideoFile = useCallback(
     (file: File) => {
@@ -261,16 +282,102 @@ export function UploadZone({
   return (
     <div className="grid gap-4 sm:grid-cols-2 items-stretch" id="upload-zone">
       <div className="h-[160px] flex flex-col justify-stretch">
-        <DropZone
-          label="video file"
-          accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
-          icon={videoIcon}
-          file={videoFile}
-          onFile={handleVideoFile}
-          onRemove={onVideoRemove}
-          disabled={disabled}
-          sublabel="MP4, WebM, MOV, or MKV"
-        />
+        {videoFile ? (
+          <DropZone
+            label="video file"
+            accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
+            icon={videoIcon}
+            file={videoFile}
+            onFile={handleVideoFile}
+            onRemove={onVideoRemove}
+            disabled={disabled}
+            sublabel="MP4, WebM, MOV, or MKV"
+          />
+        ) : youtubeId ? (
+          <div className="group relative flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 h-full w-full transition-all duration-300 hover:border-white/20 hover:bg-white/[0.05]">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/20 text-red-400 [&>svg]:w-5 [&>svg]:h-5">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.518 3.545 12 3.545 12 3.545s-7.518 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.87.508 9.388.508 9.388.508s7.518 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-white/90">
+                  YouTube Video Loaded
+                </p>
+                <p className="text-[10px] text-white/40 truncate font-mono">
+                  ID: {youtubeId}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onYoutubeRemove}
+              disabled={disabled}
+              className="shrink-0 rounded-lg p-1.5 text-white/20 transition-colors hover:bg-white/10 hover:text-red-400 disabled:opacity-50"
+              aria-label="Remove YouTube video"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <Tabs defaultValue="upload" className="w-full h-full flex flex-col">
+            <TabsList className="grid w-full grid-cols-2 mb-2 bg-white/5 p-1 rounded-lg shrink-0 h-9">
+              <TabsTrigger value="upload" className="rounded-md text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white">Upload File</TabsTrigger>
+              <TabsTrigger value="youtube" className="rounded-md text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white">YouTube Link</TabsTrigger>
+            </TabsList>
+            <TabsContent value="upload" className="mt-0 flex-1 h-0">
+              <DropZone
+                label="video file"
+                accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
+                icon={videoIcon}
+                file={videoFile}
+                onFile={handleVideoFile}
+                onRemove={onVideoRemove}
+                disabled={disabled}
+                sublabel="MP4, WebM, MOV, or MKV"
+                isCompact
+              />
+            </TabsContent>
+            <TabsContent value="youtube" className="mt-0 flex-1 h-0 flex flex-col justify-stretch">
+              <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-2 h-full justify-between">
+                <div className="flex-1 flex flex-col justify-center px-1">
+                  <input
+                    type="text"
+                    placeholder="Paste YouTube Link or Video ID..."
+                    value={youtubeInput}
+                    onChange={(e) => setYoutubeInput(e.target.value)}
+                    disabled={disabled}
+                    className="w-full bg-white/5 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white placeholder:text-white/20 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleYoutubeSubmit();
+                      }
+                    }}
+                  />
+                </div>
+                <Button
+                  onClick={handleYoutubeSubmit}
+                  disabled={disabled || !youtubeInput.trim()}
+                  className="w-full text-xs h-7 bg-violet-600 hover:bg-violet-500 text-white border-0 transition-colors shrink-0 rounded-md"
+                >
+                  Load YouTube Video
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
 
       <div className="h-[160px] flex flex-col justify-stretch">

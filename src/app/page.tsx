@@ -18,10 +18,12 @@ import {
 } from "@/types";
 import { parseSRT } from "@/lib/srt-parser";
 import { toast } from "sonner";
+import { extractYoutubeId } from "@/lib/utils";
 
 // ── State management ──────────────────────────────────────────────
 interface AppState {
   videoFile: File | null;
+  youtubeId: string | null;
   srtFile: File | null;
   subtitles: SubtitleCue[];
   style: SubtitleStyle;
@@ -34,6 +36,7 @@ interface AppState {
 
 type AppAction =
   | { type: "SET_VIDEO"; file: File | null }
+  | { type: "SET_YOUTUBE"; id: string | null }
   | { type: "SET_SRT"; file: File | null; subtitles: SubtitleCue[] }
   | { type: "SET_SUBTITLES"; subtitles: SubtitleCue[] }
   | { type: "SET_STYLE"; style: SubtitleStyle }
@@ -47,6 +50,7 @@ type AppAction =
 
 const initialState: AppState = {
   videoFile: null,
+  youtubeId: null,
   srtFile: null,
   subtitles: [],
   style: DEFAULT_STYLE,
@@ -60,7 +64,10 @@ const initialState: AppState = {
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "SET_VIDEO":
-      return { ...state, videoFile: action.file };
+      return { ...state, videoFile: action.file, youtubeId: null };
+    case "SET_YOUTUBE":
+      return { ...state, youtubeId: action.id, videoFile: null };
+
     case "SET_SRT":
       return {
         ...state,
@@ -123,7 +130,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 // ── Component ─────────────────────────────────────────────────────
 export default function Home() {
   const [state, dispatch] = useReducer(appReducer, initialState);
-  const { videoFile, srtFile, subtitles, style, exportSettings, isProcessing, isSidebarOpen, pastSubtitles, futureSubtitles } = state;
+  const { videoFile, youtubeId, srtFile, subtitles, style, exportSettings, isProcessing, isSidebarOpen, pastSubtitles, futureSubtitles } = state;
 
   const [activeCueIndex, setActiveCueIndex] = useState<number | null>(null);
   const videoPreviewRef = useRef<VideoPreviewHandle>(null);
@@ -133,7 +140,7 @@ export default function Home() {
 
   // Auto-collapse upload zone once both files are uploaded for the first time
   useEffect(() => {
-    if (videoFile && subtitles.length > 0) {
+    if ((videoFile || youtubeId) && subtitles.length > 0) {
       if (!hasAutoCollapsed) {
         setShowUpload(false);
         setHasAutoCollapsed(true);
@@ -142,13 +149,14 @@ export default function Home() {
       setHasAutoCollapsed(false);
       setShowUpload(true);
     }
-  }, [videoFile, subtitles.length, hasAutoCollapsed]);
+  }, [videoFile, youtubeId, subtitles.length, hasAutoCollapsed]);
 
   // Load from localStorage on client-side mount
   useEffect(() => {
     const savedSubtitles = localStorage.getItem("subvideo_subtitles");
     const savedStyle = localStorage.getItem("subvideo_style");
     const savedExportSettings = localStorage.getItem("subvideo_export_settings");
+    const savedYoutubeId = localStorage.getItem("subvideo_youtube_id");
 
     if (savedSubtitles) {
       try {
@@ -178,6 +186,15 @@ export default function Home() {
         console.error("Failed to parse saved export settings", e);
       }
     }
+
+    if (savedYoutubeId) {
+      const validatedId = extractYoutubeId(savedYoutubeId);
+      if (validatedId) {
+        dispatch({ type: "SET_YOUTUBE", id: validatedId });
+      } else {
+        localStorage.removeItem("subvideo_youtube_id");
+      }
+    }
   }, []);
 
   // Debounced auto-save for subtitles
@@ -201,6 +218,15 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem("subvideo_export_settings", JSON.stringify(exportSettings));
   }, [exportSettings]);
+
+  // Auto-save youtubeId
+  useEffect(() => {
+    if (youtubeId) {
+      localStorage.setItem("subvideo_youtube_id", youtubeId);
+    } else {
+      localStorage.removeItem("subvideo_youtube_id");
+    }
+  }, [youtubeId]);
 
   // Keyboard shortcuts listener for Undo/Redo
   useEffect(() => {
@@ -272,6 +298,14 @@ export default function Home() {
     dispatch({ type: "SET_VIDEO", file });
   }, []);
 
+  const handleYoutubeLoad = useCallback((id: string) => {
+    dispatch({ type: "SET_YOUTUBE", id });
+  }, []);
+
+  const handleYoutubeRemove = useCallback(() => {
+    dispatch({ type: "SET_YOUTUBE", id: null });
+  }, []);
+
   const handleSrtUpload = useCallback(async (file: File) => {
     // Guard against unreasonably large SRT files (>5MB is suspicious)
     if (file.size > 5 * 1024 * 1024) {
@@ -298,7 +332,7 @@ export default function Home() {
     dispatch({ type: "CLEAR_SRT" });
   }, []);
 
-  const hasFiles = videoFile !== null || subtitles.length > 0;
+  const hasFiles = videoFile !== null || youtubeId !== null || subtitles.length > 0;
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -315,7 +349,7 @@ export default function Home() {
         <section>
           {showUpload ? (
             <div className="relative">
-              {videoFile && subtitles.length > 0 && (
+              {(videoFile || youtubeId) && subtitles.length > 0 && (
                 <div className="absolute right-3 top-3 z-20">
                   <button
                     onClick={() => setShowUpload(false)}
@@ -328,10 +362,13 @@ export default function Home() {
               )}
               <UploadZone
                 videoFile={videoFile}
+                youtubeId={youtubeId}
                 srtFile={srtFile}
                 onVideoUpload={handleVideoUpload}
+                onYoutubeLoad={handleYoutubeLoad}
                 onSrtUpload={handleSrtUpload}
                 onVideoRemove={handleVideoRemove}
+                onYoutubeRemove={handleYoutubeRemove}
                 onSrtRemove={handleSrtRemove}
                 disabled={isProcessing}
               />
@@ -344,7 +381,7 @@ export default function Home() {
                   Files Loaded
                 </div>
                 <span className="text-xs text-white/50 truncate font-medium">
-                  {videoFile?.name || "Video"} · {subtitles.length} Subtitles
+                  {videoFile ? videoFile.name : youtubeId ? `YouTube Video (${youtubeId})` : "Video"} · {subtitles.length} Subtitles
                 </span>
               </div>
               <button
@@ -369,6 +406,7 @@ export default function Home() {
                     <VideoPreview
                       ref={videoPreviewRef}
                       videoFile={videoFile}
+                      youtubeId={youtubeId}
                       subtitles={subtitles}
                       style={style}
                       aspectRatio={exportSettings.aspectRatio}
