@@ -66,7 +66,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
   function VideoPreview({ videoFile, youtubeId, subtitles, style, aspectRatio, onActiveCueChange }: VideoPreviewProps, ref) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const youtubeRef = useRef<HTMLDivElement>(null);
+    const youtubeContainerRef = useRef<HTMLDivElement>(null);
     const playerRef = useRef<any>(null);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastActiveCueIndexRef = useRef<number | null>(null);
@@ -140,7 +140,11 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
     useEffect(() => {
       if (!youtubeId) {
         if (playerRef.current) {
-          playerRef.current.destroy();
+          try {
+            playerRef.current.destroy();
+          } catch (e) {
+            console.error("Error destroying YT player", e);
+          }
           playerRef.current = null;
         }
         setIsPlayerReady(false);
@@ -158,46 +162,72 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(
       loadYoutubeApi().then(() => {
         if (!active) return;
 
-        if (playerRef.current) {
-          playerRef.current.destroy();
-          playerRef.current = null;
-        }
+        if (youtubeContainerRef.current) {
+          // Clear any existing children
+          youtubeContainerRef.current.innerHTML = "";
 
-        const player = new window.YT.Player(youtubeRef.current, {
-          videoId: youtubeId,
-          playerVars: {
-            controls: 0,
-            disablekb: 1,
-            fs: 0,
-            rel: 0,
-            modestbranding: 1,
-            playsinline: 1,
-            wmode: "opaque",
-          },
-          events: {
-            onReady: (event: any) => {
-              if (!active) return;
-              playerRef.current = event.target;
-              setIsPlayerReady(true);
-              setDuration(event.target.getDuration());
-              event.target.setPlaybackRate(playbackRate);
+          // Create programmatically a child div for YT API to replace
+          const playerDiv = document.createElement("div");
+          playerDiv.className = "w-full h-full aspect-video";
+          youtubeContainerRef.current.appendChild(playerDiv);
+
+          if (playerRef.current) {
+            try {
+              playerRef.current.destroy();
+            } catch (e) {
+              console.error("Error destroying old YT player", e);
+            }
+            playerRef.current = null;
+          }
+
+          const player = new window.YT.Player(playerDiv, {
+            videoId: youtubeId,
+            playerVars: {
+              controls: 0,
+              disablekb: 1,
+              fs: 0,
+              rel: 0,
+              modestbranding: 1,
+              playsinline: 1,
+              wmode: "opaque",
             },
-            onStateChange: (event: any) => {
-              if (!active) return;
-              const state = event.data;
-              // YT.PlayerState: PLAYING (1), PAUSED (2), ENDED (0), BUFFERING (3), CUED (5), UNSTARTED (-1)
-              if (state === 1) {
-                setIsPlaying(true);
-              } else if (state === 2 || state === 0 || state === -1) {
-                setIsPlaying(false);
-              }
+            events: {
+              onReady: (event: any) => {
+                if (!active) return;
+                playerRef.current = event.target;
+                setIsPlayerReady(true);
+                setDuration(event.target.getDuration());
+                event.target.setPlaybackRate(playbackRate);
+              },
+              onStateChange: (event: any) => {
+                if (!active) return;
+                const state = event.data;
+                // YT.PlayerState: PLAYING (1), PAUSED (2), ENDED (0), BUFFERING (3), CUED (5), UNSTARTED (-1)
+                if (state === 1) {
+                  setIsPlaying(true);
+                } else if (state === 2 || state === 0 || state === -1) {
+                  setIsPlaying(false);
+                }
+              },
             },
-          },
-        });
+          });
+        }
       });
 
       return () => {
         active = false;
+        if (playerRef.current) {
+          try {
+            playerRef.current.destroy();
+          } catch (e) {
+            console.error("Error destroying YT player in cleanup", e);
+          }
+          playerRef.current = null;
+        }
+        setIsPlayerReady(false);
+        if (youtubeContainerRef.current) {
+          youtubeContainerRef.current.innerHTML = "";
+        }
       };
     }, [youtubeId]);
 
